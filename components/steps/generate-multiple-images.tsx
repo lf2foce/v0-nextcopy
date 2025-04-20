@@ -426,6 +426,29 @@ export default function GenerateMultipleImages({
               if (result.success && result.data.hasImages && result.data.images?.length > 0) {
                 console.log(`Found images for post ${postId} during auto-refresh`)
                 updatePostWithImages(postId, result.data.images)
+                
+                // Also save to database immediately to ensure persistence
+                try {
+                  const { updatePostImages } = await import("@/lib/actions")
+                  const formattedData = {
+                    images: result.data.images.map((img: any, idx: number) => ({
+                      ...img,
+                      isSelected: true, // Mark all as selected by default
+                      order: idx,
+                    })),
+                  }
+                  
+                  await updatePostImages([
+                    {
+                      id: postId,
+                      image: result.data.images[0]?.url || "",
+                      imagesJson: JSON.stringify(formattedData),
+                    },
+                  ])
+                  console.log("Successfully saved auto-refreshed images to database for post:", postId)
+                } catch (error) {
+                  console.error("Error saving auto-refreshed images to database:", error)
+                }
 
                 // Stop polling for this post
                 if (pollingTimers[postId]) {
@@ -452,7 +475,7 @@ export default function GenerateMultipleImages({
 
         // Force a UI refresh
         forceUIRefresh()
-      }, 5000) // Check every 5 seconds
+      }, 1500) // Check even more frequently (every 1.5 seconds) for better UX
 
       return () => clearInterval(refreshTimer)
     }

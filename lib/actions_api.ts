@@ -430,14 +430,20 @@ export async function checkImageGenerationStatus(postId: number) {
       }
     }
 
+    // Filter out any placeholder images for more accurate status reporting
+    const realImages = images.filter((img: any) => 
+      img.url && typeof img.url === 'string' && !img.url.includes('placeholder.svg')
+    );
+    
     return {
       success: true,
       data: {
         status: post.image_status || "pending",
         isComplete: post.image_status === "completed",
-        hasImages: images.length > 0,
-        images: images,
+        hasImages: realImages.length > 0,
+        images: realImages.length > 0 ? realImages : images,
         imageUrl: post.imageUrl,
+        updatedAt: post.updatedAt || new Date(), // Include timestamp for cache busting
       },
     }
   } catch (error) {
