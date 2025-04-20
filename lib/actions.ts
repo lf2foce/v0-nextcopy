@@ -537,7 +537,9 @@ export async function postToSocialMedia(postId: number, platform: string, conten
     console.log(`Posting to ${platform} for post ID ${postId}`)
 
     // Call the API route - note we're not using content parameter anymore
-    const response = await fetch(`https://nextcopy.vercel.app/api/social/${platform}/post`, {
+    const baseUrl = process.env.NEXT_PUBLIC_URL || "localhost:3000"
+    const protocol = baseUrl.includes("localhost") ? "http://" : "https://"
+    const response = await fetch(`${protocol}${baseUrl}/api/social/${platform}/post`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
