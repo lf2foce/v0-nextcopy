@@ -82,10 +82,11 @@ export async function generateThemes(campaignId: number, themesData?: ThemeType[
 
       const themesToInsert: NewTheme[] = (themesData || []).map((theme) => ({
         campaignId,
-        title: theme.name,
-        story: theme.description,
+        title: theme.name || "Untitled Theme",
+        story: theme.description || "",
         isSelected: false,
-        status: "pending",
+        status: "pending" as const,
+        post_status: "pending"
       }))
 
       console.log("Inserting themes:", themesToInsert)
@@ -101,7 +102,7 @@ export async function generateThemes(campaignId: number, themesData?: ThemeType[
 
     // Use the external API via our proxy endpoint
     console.log("Fetching themes from external API")
-    try {    // Use an absolute URL constructed from environment variable
+    
     const baseUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
     const apiUrl = new URL('/api/copy/themes/generate', baseUrl).toString();
     
@@ -111,9 +112,8 @@ export async function generateThemes(campaignId: number, themesData?: ThemeType[
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout
     
-    // Try the fetch with retry logic
+    let response: Response | undefined;
     let retries = 2;
-    let response;
     
     while (retries >= 0) {
       try {
@@ -124,154 +124,65 @@ export async function generateThemes(campaignId: number, themesData?: ThemeType[
           },
           body: JSON.stringify({ campaignId }),
           signal: controller.signal,
-          // Bypass any caching issues
           cache: 'no-store',
-          // Increase timeout at Next.js level
           next: { revalidate: 0 }
         });
-        
-        // If we get here, the request succeeded
         break;
-      } catch (error) {
-        console.log(`API request attempt failed, ${retries} retries left`, error);
-        if (retries <= 0) throw error;
+      } catch (fetchError) {
+        console.log(`API request attempt failed, ${retries} retries left`, fetchError);
+        if (retries <= 0) throw new Error(`Failed to connect to external API: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
         retries--;
-        
-        // Wait 2 seconds before retrying
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
     
-    // Clear the timeout as we got a response or exhausted retries
     clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        // Try to get error details - first as JSON, then as text
-        let errorMessage = `External API error: ${response.status} ${response.statusText}`
-
-        try {
-          const errorData = await response.json()
-          errorMessage = errorData.error || errorMessage
-        } catch (jsonError) {
-          // If JSON parsing fails, try to get the response as text
-          try {
-            const errorText = await response.text()
-            if (errorText) {
-              errorMessage = `${errorMessage} - ${errorText.substring(0, 100)}`
-            }
-          } catch (textError) {
-            // If even text extraction fails, use the default error message
-          }
-        }
-
-        console.error("API error:", errorMessage)
-        throw new Error(errorMessage)
-      }
-
-      // Try to parse the response as JSON with better error handling
-      try {
-        const apiResult = await response.json()
-        console.log("API result received:", apiResult);
-
-        // Handle different response formats more flexibly
-        // The API might return: { success, data } or { themes } or directly an array of themes
-        let apiThemes;
-        
-        if (apiResult.success === false) {
-          // Explicit failure returned from API
-          throw new Error(apiResult.error || "API returned unsuccessful response")
-        } else if (apiResult.data) {
-          // Our API route wrapped the response in data field
-          apiThemes = apiResult.data;
-        } else if (apiResult.themes) {
-          // FastAPI might return { themes: [...] }
-          apiThemes = apiResult.themes;
-        } else if (Array.isArray(apiResult)) {
-          // FastAPI might return the themes array directly
-          apiThemes = apiResult;
-        } else {
-          // If we can't identify the format but have something, try to use it
-          apiThemes = apiResult;
-        }
-        
-        // If we still don't have valid themes, use mock data as fallback
-        if (!apiThemes || (Array.isArray(apiThemes) && apiThemes.length === 0)) {
-          console.log("No themes returned from API, using mock themes as fallback");
-          // Generate mock themes based on themeIdeas
-          apiThemes = themeIdeas.slice(0, 4).map((theme) => ({
-            name: theme.name,
-            description: theme.description,
-            post_status: "pending"
-          }));
-        }
-
-        // Ensure apiThemes is an array before proceeding
-        if (!Array.isArray(apiThemes)) {
-          console.error("Expected themes array but got:", apiThemes);
-          throw new Error("Invalid themes data format received from API");
-        }
-        
-        // First, delete all existing themes for this campaign
-        await db.delete(themes).where(eq(themes.campaignId, campaignId))
-
-        // Map API themes to our database schema with better error handling
-        const themesToInsert: NewTheme[] = apiThemes.map((theme: any) => ({
-          campaignId,
-          title: typeof theme === 'object' ? (theme.name || theme.title || "Untitled Theme") : "Untitled Theme",
-          story: typeof theme === 'object' ? (theme.description || theme.story || "") : String(theme),
-          isSelected: false,
-          status: "pending",
-          post_status: typeof theme === 'object' && theme.post_status ? theme.post_status : "pending",
-        }))
-
-        console.log("Inserting themes from API:", themesToInsert)
-        const insertedThemes = await db.insert(themes).values(themesToInsert).returning()
-        console.log("Inserted themes:", insertedThemes)
-
-        // Update campaign step to Generate Theme (2)
-        const CAMPAIGN_STEPS = await getCampaignSteps()
-        await updateCampaignStep(campaignId, CAMPAIGN_STEPS.GENERATE_THEME)
-
-        return { success: true, data: insertedThemes }
-      } catch (parseError) {
-        console.error("Error parsing API response:", parseError)
-        
-        // Instead of throwing an error, fallback to mock themes
-        console.log("Falling back to mock theme generation due to API error");
-        
-        // First, delete all existing themes for this campaign if any
-        await db.delete(themes).where(eq(themes.campaignId, campaignId))
-        
-        // Use theme ideas as fallback
-        const fallbackThemes = themeIdeas.slice(0, 4).map((theme, index) => ({
-          campaignId,
-          title: theme.name,
-          story: theme.description,
-          isSelected: false,
-          status: "pending",
-          post_status: "pending",
-        }));
-        
-        console.log("Inserting fallback themes:", fallbackThemes);
-        const insertedThemes = await db.insert(themes).values(fallbackThemes).returning();
-        console.log("Inserted fallback themes:", insertedThemes);
-        
-        // Update campaign step
-        const CAMPAIGN_STEPS = await getCampaignSteps();
-        await updateCampaignStep(campaignId, CAMPAIGN_STEPS.GENERATE_THEME);
-        
-        return { success: true, data: insertedThemes };
-      }
-    } catch (fetchError) {
-      console.error("Fetch error when calling external API:", fetchError)
-      throw new Error(`Failed to connect to external API: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`)
+    
+    if (!response) {
+      throw new Error("Failed to get response from API after multiple attempts");
     }
+
+    if (!response.ok) {
+      let errorMessage = `External API error: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch {
+        try {
+          const errorText = await response.text();
+          if (errorText) {
+            errorMessage = `${errorMessage} - ${errorText.substring(0, 100)}`;
+          }
+        } catch {
+          // Use default error message
+        }
+      }
+      throw new Error(errorMessage);
+    }
+
+    const apiResult = await response.json();
+    console.log("API result received:", apiResult);
+
+    let apiThemes;
+    if (apiResult.success === false) {
+      throw new Error(apiResult.error || "API returned unsuccessful response");
+    } else if (apiResult.data) {
+      apiThemes = apiResult.data;
+    } else if (apiResult.themes) {
+      apiThemes = apiResult.themes;
+    } else if (Array.isArray(apiResult)) {
+      apiThemes = apiResult;
+    } else {
+      apiThemes = apiResult;
+    }
+
+    return { success: true, data: apiThemes };
   } catch (error) {
-    console.error("Failed to generate themes:", error)
+    console.error("Failed to generate themes:", error);
     return {
       success: false,
       error: "Failed to generate themes: " + (error instanceof Error ? error.message : String(error)),
-    }
+    };
   }
 }
 
@@ -370,7 +281,7 @@ export async function checkThemePostStatus(themeId: number) {
     const isReady = themeData.post_status === "ready"
 
     // If the theme is ready, fetch the posts
-    let posts = []
+    let posts: typeof contentPosts.$inferSelect[] = []
     if (isReady) {
       posts = await db.select().from(contentPosts).where(eq(contentPosts.themeId, themeId))
     }
@@ -509,27 +420,27 @@ export async function generateImagesForPost(postId: number, numImages = 1, image
 // Add this function to check image generation status for a post
 export async function checkImageGenerationStatus(postId: number) {
   try {
-    console.log(`Checking image generation status for post ${postId}`)
-
-    // Get the post from the database to check its image_status
-    const [post] = await db.select().from(contentPosts).where(eq(contentPosts.id, postId)).limit(1)
+    // Get the post and its images
+    const [post] = await db
+      .select()
+      .from(contentPosts)
+      .where(eq(contentPosts.id, postId))
+      .limit(1);
 
     if (!post) {
       return {
         success: false,
         error: "Post not found",
-      }
+      };
     }
 
-    // Return the current status and any images if they exist
-    let images = []
-    if (post.images) {
-      try {
-        const imagesData = JSON.parse(post.images)
-        images = imagesData.images?.images || imagesData.images || []
-      } catch (e) {
-        console.error("Error parsing images JSON:", e)
-      }
+    // Parse images JSON if it exists
+    let images = [];
+    try {
+      images = post.images ? JSON.parse(post.images) : [];
+    } catch (e) {
+      console.warn("Failed to parse images JSON:", e);
+      images = [];
     }
 
     // Filter out any placeholder images for more accurate status reporting
@@ -545,14 +456,14 @@ export async function checkImageGenerationStatus(postId: number) {
         hasImages: realImages.length > 0,
         images: realImages.length > 0 ? realImages : images,
         imageUrl: post.imageUrl,
-        updatedAt: post.updatedAt || new Date(), // Include timestamp for cache busting
+        updatedAt: post.createdAt || new Date(),
       },
-    }
+    };
   } catch (error) {
-    console.error("Failed to check image generation status:", error)
+    console.error("Failed to check image generation status:", error);
     return {
       success: false,
       error: "Failed to check image status: " + (error instanceof Error ? error.message : String(error)),
-    }
+    };
   }
 }
