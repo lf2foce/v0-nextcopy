@@ -47,7 +47,9 @@ export async function generateThemes(campaignId: number, themesData?: ThemeType[
     const themesToUse = themesData || themeIdeas.map((theme, index) => ({
       id: `mock-${Date.now()}-${index}`,
       name: theme.name,
+      title: theme.name, // Add title property explicitly
       description: theme.description,
+      story: theme.description, // Add story property explicitly
       campaignId: campaignId,
     }))
 

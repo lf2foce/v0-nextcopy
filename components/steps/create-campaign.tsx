@@ -313,7 +313,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
             name="startDate"
             type="date"
             required
-            min={today}
+            min={today} // Giá trị min này cho phép chọn ngày hôm nay
             value={formattedStartDate}
             onChange={handleDateChange}
             className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"

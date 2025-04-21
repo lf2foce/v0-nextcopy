@@ -65,9 +65,17 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
 
   // Add this useEffect to start polling when the component mounts
   useEffect(() => {
-    if (campaign && theme && typeof theme.id === "number") {
-      // Start polling for content when component mounts
-      startPollingForContent(theme.id)
+    if (campaign && theme && (typeof theme.id === "number" || typeof theme.id === "string")) {
+      const themeId = typeof theme.id === "string" ? parseInt(theme.id, 10) : theme.id;
+      if (!isNaN(themeId)) {
+        console.log(`Starting polling for content with themeId: ${themeId}`);
+        // Start polling for content when component mounts
+        startPollingForContent(themeId);
+      } else {
+        console.error("Invalid theme ID:", theme.id);
+      }
+    } else {
+      console.log("Missing required data:", { campaign, theme });
     }
   }, [campaign, theme])
 

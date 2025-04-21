@@ -49,10 +49,11 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
         // Completely replace existing themes
         setThemes(result.data)
 
-        if (result.warning) {
+        // Check for warnings in any custom property of the result
+        if (typeof result === 'object' && 'warning' in result && result.warning) {
           toast({
             title: "Warning",
-            description: result.warning,
+            description: result.warning as string,
           })
         }
       } else {
@@ -119,6 +120,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
     try {
       // Only call selectTheme if the theme has a numeric ID (saved in database)
       if (typeof selectedTheme.id === "number") {
+        console.log(`Selecting theme with ID ${selectedTheme.id}...`)
         const result = await selectTheme(selectedTheme.id)
 
         if (!result.success) {
@@ -130,15 +132,27 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
           setIsSelecting(false)
           return
         }
-
-        toast({
-          title: "Theme selected",
-          description: `Theme "${selectedTheme.title || selectedTheme.name}" has been selected.`,
-        })
+        
+        // Ensure the theme data is correctly marked as selected in the database
+        console.log("Theme selected successfully in database")
+        
+        // Wait a moment to ensure database operations complete
+        await new Promise(resolve => setTimeout(resolve, 500))
       }
 
-      // Immediately move to the next step without polling
-      onThemeSelected(selectedTheme)
+      // Prepare a clean theme object with required properties to avoid issues in the next step
+      const themeForNextStep: Theme = {
+        ...selectedTheme,
+        id: selectedTheme.id,
+        isSelected: true,
+        title: selectedTheme.title || selectedTheme.name || "Selected Theme",
+        name: selectedTheme.name || selectedTheme.title || "Selected Theme"
+      }
+      
+      console.log("Moving to content step with theme:", themeForNextStep)
+      
+      // Pass the enhanced theme object to the parent component to move to next step
+      onThemeSelected(themeForNextStep)
     } catch (error) {
       console.error("Theme selection error:", error)
       toast({

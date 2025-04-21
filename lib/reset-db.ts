@@ -22,8 +22,10 @@ export async function resetDatabase() {
   try {
     // Configure Neon client with a longer timeout (5 minutes)
     const client = neon(connectionString, {
-      connectionTimeoutMillis: 300000, // 5 minutes
-      queryTimeoutMillis: 300000, // 5 minutes
+      fetchOptions: {
+        keepalive: true,
+        timeout: 300000, // 5 minutes
+      }
     })
 
     const db = drizzle(client)
@@ -75,7 +77,7 @@ export async function resetDatabase() {
           ])
           console.log(`Successfully dropped table: ${table}`)
         } catch (tableError) {
-          console.error(`Error dropping table ${table}:`, tableError.message)
+          console.error(`Error dropping table ${table}:`, tableError instanceof Error ? tableError.message : String(tableError))
           // Continue with other tables even if one fails
         }
       }
@@ -98,7 +100,7 @@ export async function resetDatabase() {
           await db.execute(sql.raw(`DROP TYPE IF EXISTS "${enumType}" CASCADE`))
           console.log(`Successfully dropped enum type: ${enumType}`)
         } catch (enumError) {
-          console.error(`Error dropping enum type ${enumType}:`, enumError.message)
+          console.error(`Error dropping enum type ${enumType}:`, enumError instanceof Error ? enumError.message : String(enumError))
           // Continue with other enums even if one fails
         }
       }

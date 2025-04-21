@@ -12,49 +12,8 @@ import WorkflowProgress from "./workflow-progress"
 import { useToast } from "@/hooks/use-toast"
 import { updateCampaignStep } from "@/lib/actions"
 import { getCampaignSteps } from "@/lib/campaign-steps"
-// First, add the import for the new component
 import GenerateMultipleImages from "./steps/generate-multiple-images"
-
-// Update the Campaign type to match the new schema
-export type Campaign = {
-  id?: number
-  name: string
-  description: string
-  target: string
-  insight?: string
-  repeatEveryDays: number
-  startDate: Date
-  currentStep?: number
-  title?: string
-  targetCustomer?: string
-}
-
-export type Theme = {
-  id: string | number
-  name?: string
-  description?: string
-  campaignId?: number
-  isSelected?: boolean
-  title?: string
-  story?: string
-  tags?: string[]
-}
-
-export type Post = {
-  id: string | number
-  content: string
-  image?: string
-  imageUrl?: string
-  videoUrl?: string
-  imageGenerated?: boolean
-  videoGenerated?: boolean
-  campaignId?: number
-  themeId?: number
-  isApproved?: boolean
-  isScheduled?: boolean
-  title?: string
-  status?: string
-}
+import { Campaign, Theme, Post, CampaignWorkflowProps } from "@/types"
 
 // Updated steps - added Video step between Images and Review
 const steps = ["New campaign", "Themes", "Content", "Images", "Video", "Review", "Schedule"]
@@ -69,20 +28,6 @@ const uiToDatabaseStepMap = {
   5: 6, // Review -> 6 (Review)
   6: 7, // Schedule -> 7 (Completion)
   // Step 8 is reserved for fully scheduled campaigns
-}
-
-interface CampaignWorkflowProps {
-  initialCampaign?: Campaign
-  initialStep?: number
-  initialData?: {
-    campaign?: Campaign
-    themes?: Theme[]
-    selectedTheme?: Theme
-    posts?: Post[]
-    selectedPosts?: Post[]
-    postsWithImages?: Post[]
-    postsWithVideos?: Post[]
-  }
 }
 
 export default function CampaignWorkflow({ initialCampaign, initialStep = 0, initialData }: CampaignWorkflowProps) {
@@ -180,8 +125,24 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
 
   const handleThemeSelected = (theme: Theme) => {
     console.log("Theme selected:", theme)
-    setSelectedTheme(theme)
-    nextStep()
+    
+    // Ensure we have a valid theme object with all required properties
+    const enhancedTheme: Theme = {
+      ...theme,
+      id: theme.id,
+      isSelected: true,
+      title: theme.title || theme.name || "Selected Theme",
+      name: theme.name || theme.title || "Selected Theme"
+    }
+    
+    // Set the selected theme with enhanced properties
+    setSelectedTheme(enhancedTheme)
+    
+    // Force the step change with a small delay to ensure state updates properly
+    setTimeout(() => {
+      console.log("Moving to content step with theme:", enhancedTheme)
+      nextStep()
+    }, 100)
   }
 
   const handleApproveContent = (approvedPosts: Post[]) => {

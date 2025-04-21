@@ -251,40 +251,8 @@ export async function triggerBackendPostGeneration(campaignId: number, themeId: 
     }
   }
 }
-
-// Export the updatePostVideos function
-export async function updatePostVideos(postsData: { id: number; video: string }[]) {
-  try {
-    console.log("Updating post videos:", postsData)
-
-    const updatedPosts = []
-
-    for (const post of postsData) {
-      console.log(`Updating video for post ID ${post.id} with video: ${post.video}`)
-
-      const [updatedPost] = await db
-        .update(contentPosts)
-        .set({ videoUrl: post.video }) // This is already correct - using videoUrl field
-        .where(eq(contentPosts.id, post.id))
-        .returning()
-
-      console.log("Updated post:", updatedPost)
-      updatedPosts.push(updatedPost)
-
-      // Revalidate paths
-      revalidatePath("/campaigns")
-      revalidatePath(`/campaigns/${updatedPost.campaignId}`)
-    }
-
-    return { success: true, data: updatedPosts }
-  } catch (error) {
-    console.error("Failed to update post videos:", error)
-    return {
-      success: false,
-      error: "Failed to update post videos: " + (error instanceof Error ? error.message : String(error)),
-    }
-  }
-}
+// Export the missing functions from actions_api
+export const updatePostVideos = actions_api.updatePostVideos
 
 // Generate posts for a campaign
 export async function generatePosts(campaignId: number, themeId: number, postsData: PostType[]) {
@@ -603,6 +571,8 @@ export async function toggleCampaignActiveStatus(campaignId: number, isActive: b
   }
 }
 
+// Add this function to your existing actions.ts file
+
 // Check theme status directly from the database
 export async function checkThemeStatus(themeId: number) {
   try {
@@ -641,6 +611,62 @@ export async function checkThemeStatus(themeId: number) {
     }
   }
 }
+
+// Add this function to fetch posts for a theme
+export async function fetchPostsForTheme(campaignId: number, themeId: number) {
+  try {
+    console.log(`Fetching posts for campaign ${campaignId} and theme ${themeId}`)
+
+    // Query the database for posts matching the campaign and theme
+    const posts = await db
+      .select()
+      .from(contentPosts)
+      .where(and(eq(contentPosts.campaignId, campaignId), eq(contentPosts.themeId, themeId)))
+
+    console.log(`Found ${posts.length} posts for theme ${themeId}`)
+    return { success: true, data: posts }
+  } catch (error) {
+    console.error("Failed to fetch posts for theme:", error)
+    return {
+      success: false,
+      error: "Failed to fetch posts: " + (error instanceof Error ? error.message : String(error)),
+    }
+  }
+}
+
+// Add this function to trigger backend post generation if needed
+export async function triggerBackendPostGeneration(campaignId: number, themeId: number) {
+  try {
+    console.log(`Triggering backend post generation for campaign ${campaignId} and theme ${themeId}`)
+
+    // This would call your backend API to generate posts
+    // For now, we'll just fetch existing posts as a placeholder
+    // Replace this with your actual API call
+    const posts = await db
+      .select()
+      .from(contentPosts)
+      .where(and(eq(contentPosts.campaignId, campaignId), eq(contentPosts.themeId, themeId)))
+
+    // If no posts found, return an error
+    if (posts.length === 0) {
+      return {
+        success: false,
+        error: "No posts found for this theme. The backend may not have generated them yet.",
+      }
+    }
+
+    return { success: true, data: posts }
+  } catch (error) {
+    console.error("Failed to trigger backend post generation:", error)
+    return {
+      success: false,
+      error: "Failed to generate posts: " + (error instanceof Error ? error.message : String(error)),
+    }
+  }
+}
+
+// Find the postToSocialMedia function and replace it with this updated version
+// that handles non-JSON responses better
 
 // Post to social media
 export async function postToSocialMedia(postId: number, platform: string, content: string) {
@@ -712,6 +738,42 @@ export async function postToSocialMedia(postId: number, platform: string, conten
     return {
       success: false,
       error: `Failed to post to ${platform}: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+}
+
+// Add these functions to your existing actions.ts file
+
+// Update post videos
+export async function updatePostVideos(postsData: { id: number; video: string }[]) {
+  try {
+    console.log("Updating post videos:", postsData)
+
+    const updatedPosts = []
+
+    for (const post of postsData) {
+      console.log(`Updating video for post ID ${post.id} with video: ${post.video}`)
+
+      const [updatedPost] = await db
+        .update(contentPosts)
+        .set({ videoUrl: post.video }) // This is already correct - using videoUrl field
+        .where(eq(contentPosts.id, post.id))
+        .returning()
+
+      console.log("Updated post:", updatedPost)
+      updatedPosts.push(updatedPost)
+
+      // Revalidate paths
+      revalidatePath("/campaigns")
+      revalidatePath(`/campaigns/${updatedPost.campaignId}`)
+    }
+
+    return { success: true, data: updatedPosts }
+  } catch (error) {
+    console.error("Failed to update post videos:", error)
+    return {
+      success: false,
+      error: "Failed to update post videos: " + (error instanceof Error ? error.message : String(error)),
     }
   }
 }

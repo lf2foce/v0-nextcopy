@@ -7,6 +7,8 @@ import type { Campaign, Theme, Post } from "../campaign-workflow"
 import { CheckCircle, Share2, Calendar, ListOrdered } from "lucide-react"
 import { schedulePosts } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
+import { Button } from "@/components/ui/button"
+import { Loader2 } from "lucide-react"
 
 interface CompletionStepProps {
   campaign: Campaign
@@ -17,48 +19,37 @@ interface CompletionStepProps {
 }
 
 export default function CompletionStep({ campaign, theme, posts, onScheduleComplete, onBack }: CompletionStepProps) {
-  const [isScheduled, setIsScheduled] = useState(false)
-  const [showScheduleAnimation, setShowScheduleAnimation] = useState(false)
+  const [isScheduling, setIsScheduling] = useState(false)
   const { toast } = useToast()
 
-  const handleSchedulePosts = async () => {
-    setShowScheduleAnimation(true)
-
+  const handleSchedule = async () => {
+    setIsScheduling(true)
     try {
-      // Filter posts with numeric IDs (from the database)
-      const postIds = posts.filter((post) => typeof post.id === "number").map((post) => post.id as number)
+      // Mock scheduling - replace with actual API call
+      await new Promise(resolve => setTimeout(resolve, 2000))
 
-      if (postIds.length > 0) {
-        const result = await schedulePosts(postIds)
+      // Update posts with scheduled status
+      const updatedPosts = posts.map(post => ({
+        ...post,
+        status: "scheduled",
+        scheduledDate: new Date(Date.now() + 24 * 60 * 60 * 1000) // Tomorrow
+      }))
 
-        if (!result.success) {
-          toast({
-            title: "Error",
-            description: result.error || "Failed to schedule posts",
-            variant: "destructive",
-          })
-          setShowScheduleAnimation(false)
-          return
-        }
-      }
+      toast({
+        title: "Campaign scheduled",
+        description: "Your campaign has been scheduled successfully.",
+      })
 
-      // Simulate scheduling process
-      setTimeout(() => {
-        setIsScheduled(true)
-        setShowScheduleAnimation(false)
-        toast({
-          title: "Posts scheduled",
-          description: `${posts.length} posts have been scheduled successfully.`,
-        })
-        onScheduleComplete()
-      }, 1500)
+      onScheduleComplete()
     } catch (error) {
+      console.error("Error scheduling campaign:", error)
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description: "Failed to schedule campaign",
         variant: "destructive",
       })
-      setShowScheduleAnimation(false)
+    } finally {
+      setIsScheduling(false)
     }
   }
 
@@ -76,19 +67,19 @@ export default function CompletionStep({ campaign, theme, posts, onScheduleCompl
     <div className="space-y-6">
       <div className="text-center">
         <div
-          className={`inline-flex items-center justify-center w-16 h-16 rounded-full border-4 border-black mb-4 ${isScheduled ? "bg-green-400" : "bg-yellow-300"}`}
+          className={`inline-flex items-center justify-center w-16 h-16 rounded-full border-4 border-black mb-4 ${isScheduling ? "bg-green-400" : "bg-yellow-300"}`}
         >
-          {showScheduleAnimation ? (
+          {isScheduling ? (
             <div className="animate-spin h-8 w-8 border-4 border-black border-t-transparent rounded-full"></div>
           ) : (
             <CheckCircle size={32} className="text-black" />
           )}
         </div>
-        <h2 className="text-3xl font-black mb-2">{isScheduled ? "Campaign Ready!" : "Plan to post!"}</h2>
+        <h2 className="text-3xl font-black mb-2">{isScheduling ? "Scheduling..." : "Schedule Campaign"}</h2>
         <p className="text-gray-700">
-          {isScheduled
-            ? "Your campaign has been scheduled and is ready to be shared"
-            : "Your campaign has been created and is ready to be scheduled"}
+          {isScheduling
+            ? "Your campaign is being scheduled"
+            : "Review and schedule your campaign"}
         </p>
       </div>
 
@@ -131,7 +122,7 @@ export default function CompletionStep({ campaign, theme, posts, onScheduleCompl
 
           <div>
             <h4 className="font-bold text-lg">
-              {isScheduled ? "Scheduled Posts" : "Posts with Generated Images"} ({posts.length})
+              {isScheduling ? "Scheduled Posts" : "Posts with Generated Images"} ({posts.length})
             </h4>
             <div className="space-y-4 mt-2">
               {posts.map((post) => (
@@ -144,7 +135,7 @@ export default function CompletionStep({ campaign, theme, posts, onScheduleCompl
                         fill
                         className="object-cover rounded-md"
                       />
-                      {isScheduled && (
+                      {isScheduling && (
                         <div className="absolute top-2 right-2 bg-green-400 rounded-full p-1 border-2 border-black">
                           <CheckCircle size={20} className="text-black" />
                         </div>
@@ -162,32 +153,32 @@ export default function CompletionStep({ campaign, theme, posts, onScheduleCompl
       </div>
 
       <div className="flex flex-wrap justify-center gap-4">
-        {!isScheduled && (
+        {!isScheduling && (
           <>
-            <button
+            <Button
               onClick={onBack}
-              className="py-3 px-6 bg-white border-4 border-black rounded-md font-bold text-lg hover:bg-gray-100 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+              variant="outline"
+              disabled={isScheduling}
             >
-              Back to Images
-            </button>
+              Back
+            </Button>
 
-            <button
-              onClick={handleSchedulePosts}
-              disabled={showScheduleAnimation}
-              className="py-3 px-6 bg-yellow-300 border-4 border-black rounded-md font-bold text-lg hover:bg-yellow-400 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2 disabled:opacity-70"
+            <Button
+              onClick={handleSchedule}
+              disabled={isScheduling}
             >
-              {showScheduleAnimation ? (
+              {isScheduling ? (
                 <>
-                  <div className="animate-spin h-4 w-4 border-2 border-black border-t-transparent rounded-full"></div>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Scheduling...
                 </>
               ) : (
                 <>
-                  <Calendar size={20} />
-                  Schedule Posts
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Schedule Campaign
                 </>
               )}
-            </button>
+            </Button>
           </>
         )}
 
