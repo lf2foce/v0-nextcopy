@@ -34,6 +34,13 @@ const IMAGE_STYLES = [
   { value: "oil_painting", label: "Oil Painting" },
 ]
 
+// Define available image services
+const IMAGE_SERVICES = [
+  { value: "ideogram", label: "Ideogram" },
+  { value: "gemini", label: "Gemini" },
+  { value: "flux", label: "Flux" },
+]
+
 interface GenerateMultipleImagesProps {
   posts: Post[]
   onComplete: (posts: Post[]) => void
@@ -58,8 +65,20 @@ export default function GenerateMultipleImages({
   const [numImagesPerPost, setNumImagesPerPost] = useState<Record<string | number, number>>({})
   // Add state for image style per post
   const [imageStylePerPost, setImageStylePerPost] = useState<Record<string | number, string>>({})
+  // Add state for image service per post - sử dụng mảng string để lưu nhiều dịch vụ
+  const [imageServicePerPost, setImageServicePerPost] = useState<Record<string | number, string[]>>({})
   // Add state for dropdown visibility
   const [openDropdowns, setOpenDropdowns] = useState<Record<string | number, boolean>>({})
+  // Add state for service dropdown visibility
+  const [openServiceDropdowns, setOpenServiceDropdowns] = useState<Record<string | number, boolean>>({})
+  // Add state for global service selection dropdown
+  const [globalServiceDropdownOpen, setGlobalServiceDropdownOpen] = useState(false)
+  // Add state for selected global service
+  const [globalSelectedService, setGlobalSelectedService] = useState<string>("ideogram")
+  // Add state for global style selection dropdown
+  const [globalStyleDropdownOpen, setGlobalStyleDropdownOpen] = useState(false)
+  // Add state for selected global style
+  const [globalSelectedStyle, setGlobalSelectedStyle] = useState<string>("realistic")
   // Add state to track which posts have completed image generation
   const [completedPosts, setCompletedPosts] = useState<Record<string | number, boolean>>({})
   // Add a refresh counter to force re-renders
@@ -81,12 +100,15 @@ export default function GenerateMultipleImages({
   useEffect(() => {
     const initialNumImages: Record<string | number, number> = {}
     const initialImageStyles: Record<string | number, string> = {}
+    const initialImageServices: Record<string | number, string[]> = {}
     posts.forEach((post) => {
       initialNumImages[post.id] = 1 // Default to 1 image per post
       initialImageStyles[post.id] = "realistic" // Default to realistic style
+      initialImageServices[post.id] = ["ideogram"] // Default to Ideogram service
     })
     setNumImagesPerPost(initialNumImages)
     setImageStylePerPost(initialImageStyles)
+    setImageServicePerPost(initialImageServices)
   }, [posts])
 
   // Function to increment number of images
@@ -120,28 +142,20 @@ export default function GenerateMultipleImages({
     })
   }
 
-  // Function to close all dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      let shouldCloseAll = true
-
-      // Check if the click was inside any dropdown
-      Object.entries(dropdownRefs.current).forEach(([postId, ref]) => {
-        if (ref && ref.contains(event.target as Node)) {
-          shouldCloseAll = false
-        }
+  // Function to toggle service dropdown
+  const toggleServiceDropdown = (postId: string | number, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent event bubbling
+    setOpenServiceDropdowns((prev) => {
+      const newState = { ...prev }
+      // Close all other dropdowns
+      Object.keys(newState).forEach((key) => {
+        if (key !== String(postId)) newState[key] = false
       })
-
-      if (shouldCloseAll) {
-        setOpenDropdowns({})
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [])
+      // Toggle this dropdown
+      newState[postId] = !prev[postId]
+      return newState
+    })
+  }
 
   // Function to select image style
   const selectImageStyle = (postId: string | number, style: string, e: React.MouseEvent) => {
@@ -155,6 +169,67 @@ export default function GenerateMultipleImages({
       ...prev,
       [postId]: false,
     }))
+  }
+
+  // Function to select image service
+  const selectImageService = (postId: string | number, service: string, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent the click from closing the dropdown immediately
+    
+    // Cập nhật dịch vụ cho bài đăng này
+    setImageServicePerPost((prev) => ({
+      ...prev,
+      [postId]: [service] // Chọn một dịch vụ duy nhất
+    }))
+    
+    // Đóng dropdown sau khi chọn
+    setOpenServiceDropdowns((prev) => ({
+      ...prev,
+      [postId]: false,
+    }))
+  }
+
+  // Function to toggle global service dropdown
+  const toggleGlobalServiceDropdown = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setGlobalServiceDropdownOpen(prev => !prev)
+  }
+  
+  // Function to select global service and apply to all posts
+  const selectGlobalService = (service: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setGlobalSelectedService(service)
+    
+    // Áp dụng dịch vụ này cho tất cả các bài đăng
+    const updatedServices: Record<string | number, string[]> = {}
+    posts.forEach(post => {
+      updatedServices[post.id] = [service]
+    })
+    setImageServicePerPost(updatedServices)
+    
+    // Đóng dropdown
+    setGlobalServiceDropdownOpen(false)
+  }
+
+  // Function to toggle global style dropdown
+  const toggleGlobalStyleDropdown = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setGlobalStyleDropdownOpen(prev => !prev)
+  }
+  
+  // Function to select global style and apply to all posts
+  const selectGlobalStyle = (style: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setGlobalSelectedStyle(style)
+    
+    // Áp dụng thể loại này cho tất cả các bài đăng
+    const updatedStyles: Record<string | number, string> = {}
+    posts.forEach(post => {
+      updatedStyles[post.id] = style
+    })
+    setImageStylePerPost(updatedStyles)
+    
+    // Đóng dropdown
+    setGlobalStyleDropdownOpen(false)
   }
 
   // Function to force a UI refresh
@@ -427,6 +502,29 @@ export default function GenerateMultipleImages({
                 console.log(`Found images for post ${postId} during auto-refresh`)
                 updatePostWithImages(postId, result.data.images)
 
+                // Also save to database immediately to ensure persistence
+                try {
+                  const { updatePostImages } = await import("@/lib/actions")
+                  const formattedData = {
+                    images: result.data.images.map((img: any, idx: number) => ({
+                      ...img,
+                      isSelected: true, // Mark all as selected by default
+                      order: idx,
+                    })),
+                  }
+
+                  await updatePostImages([
+                    {
+                      id: postId,
+                      image: result.data.images[0]?.url || "",
+                      imagesJson: JSON.stringify(formattedData),
+                    },
+                  ])
+                  console.log("Successfully saved auto-refreshed images to database for post:", postId)
+                } catch (error) {
+                  console.error("Error saving auto-refreshed images to database:", error)
+                }
+
                 // Stop polling for this post
                 if (pollingTimers[postId]) {
                   clearInterval(pollingTimers[postId])
@@ -452,7 +550,7 @@ export default function GenerateMultipleImages({
 
         // Force a UI refresh
         forceUIRefresh()
-      }, 5000) // Check every 5 seconds
+      }, 1500) // Check even more frequently (every 1.5 seconds) for better UX
 
       return () => clearInterval(refreshTimer)
     }
@@ -540,8 +638,9 @@ export default function GenerateMultipleImages({
         // Get the number of images and style to generate for this post
         const numImages = numImagesPerPost[postId] || 1
         const imageStyle = imageStylePerPost[postId] || "realistic"
-
-        console.log(`Generating ${numImages} images with style "${imageStyle}" for post ${postId}`)
+        const imageService = imageServicePerPost[postId]?.[0] || "ideogram"
+        
+        console.log(`Generating ${numImages} images with style "${imageStyle}" using service "${imageService}" for post ${postId}`)
 
         // Skip if this post is already being polled
         if (pollingPosts[postId]) {
@@ -549,8 +648,8 @@ export default function GenerateMultipleImages({
           return { success: true, status: "already_polling" }
         }
 
-        // Call the actual API to generate images with the number of images and style
-        const result = await generateImagesForPost(postId, numImages, imageStyle)
+        // Call the actual API to generate images with the number of images, style, and services
+        const result = await generateImagesForPost(postId, numImages, imageStyle, imageService)
 
         if (!result.success) {
           const errorMessage = result.error || "Failed to generate images from API"
@@ -1042,13 +1141,96 @@ export default function GenerateMultipleImages({
         <p className="text-sm">
           <span className="font-bold">{localPosts.length}</span> posts to generate images for
         </p>
-        <div className="flex gap-2">
+
+        <div className="flex items-center gap-4">
+          {/* Global selectors container */}
+          <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border-2 border-black">
+            {/* Global style dropdown */}
+            <div className="flex items-center">
+              <span className="text-sm font-medium mr-2">Style:</span>
+              <div className="relative">
+                <button
+                  onClick={toggleGlobalStyleDropdown}
+                  disabled={isGenerating || isSubmitting}
+                  className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 py-1 text-sm w-32 disabled:opacity-50 hover:bg-gray-50"
+                >
+                  <span>{IMAGE_STYLES.find(s => s.value === globalSelectedStyle)?.label || "Realistic"}</span>
+                  <ChevronDown size={14} className={globalStyleDropdownOpen ? "transform rotate-180" : ""} />
+                </button>
+
+                {globalStyleDropdownOpen && (
+                  <div className="absolute z-20 mt-1 w-40 bg-white border-2 border-black rounded-md shadow-lg">
+                    {IMAGE_STYLES.map((style) => (
+                      <button
+                        key={style.value}
+                        onClick={(e) => selectGlobalStyle(style.value, e)}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
+                          globalSelectedStyle === style.value ? "bg-yellow-100 font-medium" : ""
+                        }`}
+                      >
+                        {style.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Global service dropdown */}
+            <div className="flex items-center ml-2">
+              <span className="text-sm font-medium mr-2">Service:</span>
+              <div className="relative">
+                <button
+                  onClick={toggleGlobalServiceDropdown}
+                  disabled={isGenerating || isSubmitting}
+                  className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 py-1 text-sm w-32 disabled:opacity-50 hover:bg-gray-50"
+                >
+                  <span>{IMAGE_SERVICES.find(s => s.value === globalSelectedService)?.label || "Ideogram"}</span>
+                  <ChevronDown size={14} className={globalServiceDropdownOpen ? "transform rotate-180" : ""} />
+                </button>
+
+                {globalServiceDropdownOpen && (
+                  <div className="absolute z-20 mt-1 w-40 bg-white border-2 border-black rounded-md shadow-lg">
+                    {IMAGE_SERVICES.map((service) => (
+                      <button
+                        key={service.value}
+                        onClick={(e) => selectGlobalService(service.value, e)}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
+                          globalSelectedService === service.value ? "bg-yellow-100 font-medium" : ""
+                        }`}
+                      >
+                        {service.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Apply to all button */}
+            <button
+              onClick={() => {
+                selectGlobalStyle(globalSelectedStyle, { stopPropagation: () => {} } as React.MouseEvent);
+                selectGlobalService(globalSelectedService, { stopPropagation: () => {} } as React.MouseEvent);
+                toast({
+                  title: "Settings applied",
+                  description: "Style and service applied to all posts",
+                });
+              }}
+              className="ml-2 py-1 px-3 bg-blue-400 text-sm border-2 border-black rounded-md font-medium hover:bg-blue-500"
+            >
+              Apply to All
+            </button>
+          </div>
+
           <button
             onClick={manualForceUIRefresh}
-            className="py-2 px-4 bg-blue-400 border-2 border-black rounded-md font-medium hover:bg-blue-500"
+            className="py-2 px-4 bg-blue-400 border-2 border-black rounded-md font-medium hover:bg-blue-500 flex items-center gap-1"
           >
-            Refresh UI
+            <RefreshCw size={16} />
+            Refresh
           </button>
+          
           <button
             onClick={handleGenerateAllImages}
             disabled={isGenerating || isSubmitting}
@@ -1107,56 +1289,71 @@ export default function GenerateMultipleImages({
           return (
             <div
               key={`${post.id}-${refreshCounter}`}
-              className="border-4 border-black rounded-md overflow-hidden bg-white"
+              className="border-4 border-black rounded-md overflow-hidden bg-white shadow-md transition-all hover:shadow-lg"
             >
-              <div className="p-4 bg-yellow-100 border-b-4 border-black flex justify-between items-center">
-                <h3 className="font-bold text-lg">Post {index + 1}</h3>
+              <div className="p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 border-b-4 border-black flex justify-between items-center">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 flex items-center justify-center bg-black text-white rounded-full text-sm font-bold mr-2">
+                    {index + 1}
+                  </div>
+                  <h3 className="font-bold text-lg">
+                    {post.title || `Post ${index + 1}`}
+                    {isCompleted && <CheckCircle size={16} className="inline ml-2 text-green-500" />}
+                  </h3>
+                </div>
                 <div className="flex items-center gap-4">
                   {hasGeneratedImages && (
-                    <span className="text-sm font-medium">
-                      {selectedCount} of {postImages.length} selected
-                    </span>
+                    <div className="flex items-center px-3 py-1 bg-blue-50 border border-blue-200 rounded-full">
+                      <span className="text-sm font-medium text-blue-700">
+                        {selectedCount} of {postImages.length} selected
+                      </span>
+                    </div>
                   )}
 
                   {/* Image generation controls */}
                   <div className="flex items-center gap-2">
                     {/* Number of images selector */}
                     <div className="flex items-center gap-2 bg-white border-2 border-black rounded-md px-2 py-1">
+                      <span className="text-xs text-gray-500 mr-1">Quantity:</span>
                       <button
                         onClick={() => decrementNumImages(post.id)}
                         disabled={numImages <= 1 || isGeneratingOrPolling}
-                        className="text-black hover:text-gray-700 disabled:opacity-50"
+                        className="text-black hover:bg-gray-100 rounded-full p-1 disabled:opacity-50 transition-colors"
                       >
                         <MinusCircle size={16} />
                       </button>
-                      <span className="text-sm font-medium w-5 text-center">{numImages}</span>
+                      <span className="text-sm font-bold w-5 text-center">{numImages}</span>
                       <button
                         onClick={() => incrementNumImages(post.id)}
                         disabled={numImages >= 10 || isGeneratingOrPolling}
-                        className="text-black hover:text-gray-700 disabled:opacity-50"
+                        className="text-black hover:bg-gray-100 rounded-full p-1 disabled:opacity-50 transition-colors"
                       >
                         <PlusCircle size={16} />
                       </button>
                     </div>
 
                     {/* Style selector dropdown */}
-                    <div className="relative" ref={(el) => (dropdownRefs.current[post.id] = el)}>
+                    <div className="relative" ref={(el) => {
+                      dropdownRefs.current[post.id] = el;
+                      return undefined;
+                    }}>
                       <button
                         onClick={(e) => toggleDropdown(post.id, e)}
                         disabled={isGeneratingOrPolling}
-                        className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 py-1 text-sm w-32 disabled:opacity-50"
+                        className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 py-1 text-sm w-32 disabled:opacity-50 transition-colors hover:bg-gray-50"
                       >
-                        <span>{IMAGE_STYLES.find((style) => style.value === imageStyle)?.label || "Realistic"}</span>
-                        <ChevronDown size={14} className={isDropdownOpen ? "transform rotate-180" : ""} />
+                        <span className="text-xs text-gray-500 mr-1">Style:</span>
+                        <span className="font-medium truncate">{IMAGE_STYLES.find((style) => style.value === imageStyle)?.label || "Realistic"}</span>
+                        <ChevronDown size={14} className={`transition-transform ${isDropdownOpen ? "transform rotate-180" : ""}`} />
                       </button>
 
                       {isDropdownOpen && (
-                        <div className="absolute z-10 mt-1 w-40 bg-white border-2 border-black rounded-md shadow-lg">
+                        <div className="absolute z-10 mt-1 w-40 bg-white border-2 border-black rounded-md shadow-lg max-h-64 overflow-y-auto">
                           {IMAGE_STYLES.map((style) => (
                             <button
                               key={style.value}
                               onClick={(e) => selectImageStyle(post.id, style.value, e)}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
+                              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 transition-colors ${
                                 imageStyle === style.value ? "bg-yellow-100 font-medium" : ""
                               }`}
                             >
@@ -1167,20 +1364,54 @@ export default function GenerateMultipleImages({
                       )}
                     </div>
 
+                    {/* Service selector dropdown */}
+                    <div className="relative" ref={(el) => {
+                      dropdownRefs.current[`service_${post.id}`] = el;
+                      return undefined;
+                    }}>
+                      <button
+                        onClick={(e) => toggleServiceDropdown(post.id, e)}
+                        disabled={isGeneratingOrPolling}
+                        className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 py-1 text-sm w-40 disabled:opacity-50 transition-colors hover:bg-gray-50"
+                      >
+                        <span className="text-xs text-gray-500 mr-1">Service:</span>
+                        <span className="font-medium truncate">
+                          {IMAGE_SERVICES.find((service) => service.value === (imageServicePerPost[post.id]?.[0] || "ideogram"))?.label || "Ideogram"}
+                        </span>
+                        <ChevronDown size={14} className={`transition-transform ${openServiceDropdowns[post.id] ? "transform rotate-180" : ""}`} />
+                      </button>
+
+                      {openServiceDropdowns[post.id] && (
+                        <div className="absolute z-10 mt-1 w-48 bg-white border-2 border-black rounded-md shadow-lg">
+                          {IMAGE_SERVICES.map((service) => (
+                            <button
+                              key={service.value}
+                              onClick={(e) => selectImageService(post.id, service.value, e)}
+                              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 transition-colors ${
+                                (imageServicePerPost[post.id]?.[0] || "ideogram") === service.value ? "bg-yellow-100 font-medium" : ""
+                              }`}
+                            >
+                              {service.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     <button
                       onClick={() => handleRegenerateImages(post.id)}
                       disabled={isGeneratingOrPolling || isSubmitting}
-                      className="py-1 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 flex items-center gap-1 text-sm disabled:opacity-50"
+                      className="py-1 px-3 bg-gradient-to-r from-purple-400 to-purple-500 border-2 border-black rounded-md hover:opacity-90 active:opacity-80 transition-all flex items-center gap-1 text-sm disabled:opacity-50 text-white shadow-sm"
                     >
                       {isGeneratingOrPolling ? (
                         <>
                           <Loader2 size={14} className="animate-spin" />
-                          {isPollingThisPost ? "Generating..." : "Regenerating..."}
+                          <span>{isPollingThisPost ? "Generating..." : "Regenerating..."}</span>
                         </>
                       ) : (
                         <>
                           <RefreshCw size={14} />
-                          {hasGeneratedImages ? "Regenerate Images" : "Generate Images"}
+                          <span>{hasGeneratedImages ? "Regenerate Images" : "Generate Images"}</span>
                         </>
                       )}
                     </button>
@@ -1189,61 +1420,105 @@ export default function GenerateMultipleImages({
               </div>
 
               <div className="p-4">
-                <p className="text-lg mb-4 line-clamp-2">{post.content}</p>
+                {/* Cải thiện hiển thị nội dung bài đăng */}
+                <div className="mb-6 bg-gradient-to-r from-gray-50 to-white p-4 rounded-lg border-l-4 border-blue-500 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center mb-2">
+                    <h4 className="text-xs uppercase text-gray-500 font-semibold tracking-wider bg-blue-50 px-2 py-1 rounded">Post Content</h4>
+                  </div>
+                  <p className="text-lg font-medium line-clamp-3">{post.content}</p>
+                </div>
 
                 {isGeneratingOrPolling ? (
-                  <div className="h-64 flex flex-col items-center justify-center bg-gray-50 border-2 border-gray-300 border-dashed rounded-lg">
-                    <Loader2 size={32} className="animate-spin text-black mb-2" />
-                    <span className="font-medium">
-                      Generating {numImages}{" "}
-                      {IMAGE_STYLES.find((style) => style.value === imageStyle)?.label || "Realistic"} style image
-                      {numImages > 1 ? "s" : ""}...
+                  <div className="h-64 flex flex-col items-center justify-center bg-gray-50 border-2 border-gray-200 border-dashed rounded-lg animate-pulse">
+                    <div className="bg-purple-100 p-3 rounded-full mb-3">
+                      <Loader2 size={32} className="animate-spin text-purple-600" />
+                    </div>
+                    <span className="font-medium text-gray-700 bg-white px-3 py-1 rounded-full shadow-sm">
+                      Generating {numImages} {IMAGE_STYLES.find((style) => style.value === imageStyle)?.label || "Realistic"} images
                     </span>
                     {isPollingThisPost && (
-                      <p className="text-sm text-gray-500 mt-2">This may take a minute. Please wait...</p>
+                      <div className="text-sm text-gray-500 mt-3 max-w-sm text-center">
+                        <p>This process might take a moment.</p>
+                        <p className="mt-1">Please wait...</p>
+                      </div>
                     )}
                   </div>
                 ) : hasError ? (
-                  <div className="h-64 flex flex-col items-center justify-center bg-red-50 border-2 border-red-300 border-dashed rounded-lg p-4">
-                    <AlertCircle size={32} className="text-red-500 mb-2" />
-                    <p className="font-medium text-red-700 text-center">Error generating images</p>
-                    <p className="text-sm text-red-600 text-center mt-2">{hasError}</p>
+                  <div className="h-64 flex flex-col items-center justify-center bg-red-50 border-2 border-red-200 border-dashed rounded-lg p-4 shadow-inner">
+                    <div className="bg-red-100 p-3 rounded-full mb-3">
+                      <AlertCircle size={32} className="text-red-600" />
+                    </div>
+                    <p className="font-medium text-red-700 text-center text-lg mb-2">Error generating images</p>
+                    <div className="text-sm text-red-600 text-center mt-1 px-4 py-2 bg-white rounded-lg border border-red-200 max-w-md">
+                      {hasError}
+                    </div>
+                    <button 
+                      onClick={() => handleRegenerateImages(post.id)}
+                      className="mt-4 text-sm px-3 py-1 bg-white border border-red-300 text-red-700 rounded-md hover:bg-red-50 transition-colors"
+                    >
+                      Try again
+                    </button>
                   </div>
                 ) : hasGeneratedImages ? (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                       {postImages.map((image, imageIndex) => (
                         <div
                           key={imageIndex}
                           onClick={() => toggleImageSelection(post.id, imageIndex)}
                           className={`relative border-4 ${
-                            image.isSelected ? "border-green-500" : "border-black"
-                          } rounded-md overflow-hidden h-40 cursor-pointer`}
+                            image.isSelected 
+                              ? "border-green-500 ring-4 ring-green-100" 
+                              : "border-gray-200 hover:border-blue-300"
+                          } rounded-lg overflow-hidden h-52 cursor-pointer transform transition-all duration-200 hover:scale-105 hover:shadow-xl ${
+                            image.isSelected ? "shadow-lg" : "shadow-sm"
+                          }`}
                         >
                           <Image
                             src={image.url || "/placeholder.svg"}
                             alt={`Image ${imageIndex + 1} for post ${index + 1}`}
                             fill
-                            className="object-cover"
+                            className={`object-cover transition-all ${image.isSelected ? "brightness-105" : "hover:brightness-105"}`}
+                            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                            loading="lazy"
                           />
                           <div
-                            className={`absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded-full ${
-                              image.isSelected ? "bg-green-500 text-white" : "bg-white border-2 border-black"
-                            }`}
+                            className={`absolute bottom-3 right-3 w-8 h-8 flex items-center justify-center rounded-full ${
+                              image.isSelected 
+                                ? "bg-green-500 text-white scale-110 shadow-lg" 
+                                : "bg-white border-2 border-gray-300"
+                            } shadow-md transition-all duration-200`}
                           >
-                            {image.isSelected && <Check size={16} />}
+                            {image.isSelected ? <Check size={18} /> : null}
                           </div>
-                          <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                            Style: {image.metadata?.style || imageStyle || "default"}
+                          <div className="absolute top-3 left-3 bg-black/70 text-white text-xs font-medium px-2 py-1 rounded-md backdrop-blur-sm">
+                            {image.metadata?.style || imageStyle || "default"}
                           </div>
+                          {image.isSelected && (
+                            <div className="absolute inset-0 bg-gradient-to-t from-green-500/20 to-transparent pointer-events-none"></div>
+                          )}
                         </div>
                       ))}
                     </div>
-                    <p className="text-sm text-gray-600">Click on an image to select or deselect it.</p>
+                    <div className="bg-gradient-to-r from-gray-50 to-white p-3 rounded-md border border-gray-200 flex items-center text-sm">
+                      <div className="mr-2 w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center">
+                        <Check size={14} className="text-blue-600" />
+                      </div>
+                      <p className="text-gray-700">Click on an image to select or deselect it.</p>
+                    </div>
                   </div>
                 ) : (
-                  <div className="h-64 flex items-center justify-center bg-gray-50 border-2 border-gray-300 border-dashed rounded-lg">
-                    <span className="ml-2 font-medium">No images generated yet.</span>
+                  <div className="h-64 flex flex-col items-center justify-center bg-gray-50 border-2 border-gray-200 border-dashed rounded-lg">
+                    <div className="bg-gray-100 p-4 rounded-full mb-3">
+                      <Image src="/placeholder.svg" alt="No images" width={40} height={40} />
+                    </div>
+                    <span className="font-medium text-gray-600">No images have been generated yet.</span>
+                    <button 
+                      onClick={() => handleRegenerateImages(post.id)} 
+                      className="mt-3 text-sm px-3 py-1 bg-white text-purple-700 border border-purple-300 rounded-md hover:bg-purple-50 transition-colors"
+                    >
+                      Generate images now
+                    </button>
                   </div>
                 )}
               </div>

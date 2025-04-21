@@ -82,10 +82,11 @@ export async function generateThemes(campaignId: number, themesData?: ThemeType[
 
       const themesToInsert: NewTheme[] = (themesData || []).map((theme) => ({
         campaignId,
-        title: theme.name,
-        story: theme.description,
+        title: theme.name || "Untitled Theme",
+        story: theme.description || "",
         isSelected: false,
-        status: "pending",
+        status: "pending" as const,
+        post_status: "pending"
       }))
 
       console.log("Inserting themes:", themesToInsert)
@@ -101,95 +102,87 @@ export async function generateThemes(campaignId: number, themesData?: ThemeType[
 
     // Use the external API via our proxy endpoint
     console.log("Fetching themes from external API")
-    try {
-      const response = await fetch("https://nextcopy.vercel.app/api/copy/themes/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ campaignId }),
-      })
-
-      if (!response.ok) {
-        // Try to get error details - first as JSON, then as text
-        let errorMessage = `External API error: ${response.status} ${response.statusText}`
-
-        try {
-          const errorData = await response.json()
-          errorMessage = errorData.error || errorMessage
-        } catch (jsonError) {
-          // If JSON parsing fails, try to get the response as text
-          try {
-            const errorText = await response.text()
-            if (errorText) {
-              errorMessage = `${errorMessage} - ${errorText.substring(0, 100)}`
-            }
-          } catch (textError) {
-            // If even text extraction fails, use the default error message
-          }
-        }
-
-        console.error("API error:", errorMessage)
-        throw new Error(errorMessage)
-      }
-
-      // Try to parse the response as JSON with better error handling
+    
+    const baseUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
+    const apiUrl = new URL('/api/copy/themes/generate', baseUrl).toString();
+    
+    console.log(`Making API request to: ${apiUrl}`);
+    
+    // Create a custom AbortController for a longer timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000); // 90 second timeout
+    
+    let response: Response | undefined;
+    let retries = 2;
+    
+    while (retries >= 0) {
       try {
-        const apiResult = await response.json()
+        response = await fetch(apiUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ campaignId }),
+          signal: controller.signal,
+          cache: 'no-store',
+          next: { revalidate: 0 }
+        });
+        break;
+      } catch (fetchError) {
+        console.log(`API request attempt failed, ${retries} retries left`, fetchError);
+        if (retries <= 0) throw new Error(`Failed to connect to external API: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
+        retries--;
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+    
+    clearTimeout(timeoutId);
+    
+    if (!response) {
+      throw new Error("Failed to get response from API after multiple attempts");
+    }
 
-        if (!apiResult.success) {
-          throw new Error(apiResult.error || "API returned unsuccessful response")
-        }
-
-        // Process the themes from the API
-        const apiThemes = apiResult.data
-
-        // First, delete all existing themes for this campaign
-        await db.delete(themes).where(eq(themes.campaignId, campaignId))
-
-        // Map API themes to our database schema
-        const themesToInsert: NewTheme[] = apiThemes.map((theme: any) => ({
-          campaignId,
-          title: theme.name || theme.title,
-          story: theme.description || theme.story,
-          isSelected: false,
-          status: "pending",
-          post_status: theme.post_status || "pending", // Add post_status field
-        }))
-
-        console.log("Inserting themes from API:", themesToInsert)
-        const insertedThemes = await db.insert(themes).values(themesToInsert).returning()
-        console.log("Inserted themes:", insertedThemes)
-
-        // Update campaign step to Generate Theme (2)
-        const CAMPAIGN_STEPS = await getCampaignSteps()
-        await updateCampaignStep(campaignId, CAMPAIGN_STEPS.GENERATE_THEME)
-
-        return { success: true, data: insertedThemes }
-      } catch (parseError) {
-        console.error("Error parsing API response:", parseError)
-
-        // Try to get the response body as text for better error reporting
+    if (!response.ok) {
+      let errorMessage = `External API error: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch {
         try {
-          const responseText = await response.text()
-          console.error("Response body:", responseText.substring(0, 200))
-          throw new Error(
-            `Failed to parse API response: ${parseError.message}. Response starts with: ${responseText.substring(0, 50)}...`,
-          )
-        } catch (textError) {
-          throw new Error(`Failed to parse API response: ${parseError.message}`)
+          const errorText = await response.text();
+          if (errorText) {
+            errorMessage = `${errorMessage} - ${errorText.substring(0, 100)}`;
+          }
+        } catch {
+          // Use default error message
         }
       }
-    } catch (fetchError) {
-      console.error("Fetch error when calling external API:", fetchError)
-      throw new Error(`Failed to connect to external API: ${fetchError.message}`)
+      throw new Error(errorMessage);
     }
+
+    const apiResult = await response.json();
+    console.log("API result received:", apiResult);
+
+    let apiThemes;
+    if (apiResult.success === false) {
+      throw new Error(apiResult.error || "API returned unsuccessful response");
+    } else if (apiResult.data) {
+      apiThemes = apiResult.data;
+    } else if (apiResult.themes) {
+      apiThemes = apiResult.themes;
+    } else if (Array.isArray(apiResult)) {
+      apiThemes = apiResult;
+    } else {
+      apiThemes = apiResult;
+    }
+
+    return { success: true, data: apiThemes };
   } catch (error) {
-    console.error("Failed to generate themes:", error)
+    console.error("Failed to generate themes:", error);
     return {
       success: false,
       error: "Failed to generate themes: " + (error instanceof Error ? error.message : String(error)),
-    }
+    };
   }
 }
 
@@ -198,13 +191,20 @@ export async function selectTheme(themeId: number) {
   try {
     console.log(`Selecting theme ${themeId} via external API`)
 
-    // Use the external API via our proxy endpoint
-    const response = await fetch("https://nextcopy.vercel.app/api/copy/themes/select", {
+    // Use an absolute URL constructed from environment variable
+    const baseUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
+    const apiUrl = new URL('/api/copy/themes/select', baseUrl).toString();
+    
+    console.log(`Making API request to: ${apiUrl}`);
+    
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ themeId }),
+      // Prevent caching issues
+      cache: "no-store",
     })
 
     if (!response.ok) {
@@ -281,7 +281,7 @@ export async function checkThemePostStatus(themeId: number) {
     const isReady = themeData.post_status === "ready"
 
     // If the theme is ready, fetch the posts
-    let posts = []
+    let posts: typeof contentPosts.$inferSelect[] = []
     if (isReady) {
       posts = await db.select().from(contentPosts).where(eq(contentPosts.themeId, themeId))
     }
@@ -303,20 +303,33 @@ export async function checkThemePostStatus(themeId: number) {
 }
 
 // Update the generateImagesForPost function to handle async generation and style
-export async function generateImagesForPost(postId: number, numImages = 1, imageStyle = "realistic") {
+export async function generateImagesForPost(postId: number, numImages = 1, imageStyle = "realistic", imageService?: string) {
   try {
-    console.log(`Generating ${numImages} images with style "${imageStyle}" for post ${postId}`)
+    console.log(`Generating ${numImages} images with style "${imageStyle}"${imageService ? ` using ${imageService}` : ''} for post ${postId}`)
 
-    // Call our API route that will call the FastAPI backend
-    const response = await fetch(
-      `https://nextcopy.vercel.app/api/posts/${postId}/generate-images?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+    // Use an absolute URL constructed from environment variable
+    const baseUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
+    const apiUrl = new URL(`/api/posts/${postId}/generate-images`, baseUrl);
+    
+    // Add query parameters
+    apiUrl.searchParams.append('num_images', numImages.toString());
+    apiUrl.searchParams.append('style', imageStyle);
+    
+    // Add image_service parameter if provided
+    if (imageService) {
+      apiUrl.searchParams.append('image_service', imageService);
+    }
+    
+    console.log(`Making API request to: ${apiUrl.toString()}`);
+    
+    const response = await fetch(apiUrl.toString(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    )
+      // Prevent caching issues
+      cache: "no-store",
+    })
 
     // Handle non-JSON responses better
     if (!response.ok) {
@@ -407,44 +420,50 @@ export async function generateImagesForPost(postId: number, numImages = 1, image
 // Add this function to check image generation status for a post
 export async function checkImageGenerationStatus(postId: number) {
   try {
-    console.log(`Checking image generation status for post ${postId}`)
-
-    // Get the post from the database to check its image_status
-    const [post] = await db.select().from(contentPosts).where(eq(contentPosts.id, postId)).limit(1)
+    // Get the post and its images
+    const [post] = await db
+      .select()
+      .from(contentPosts)
+      .where(eq(contentPosts.id, postId))
+      .limit(1);
 
     if (!post) {
       return {
         success: false,
         error: "Post not found",
-      }
+      };
     }
 
-    // Return the current status and any images if they exist
-    let images = []
-    if (post.images) {
-      try {
-        const imagesData = JSON.parse(post.images)
-        images = imagesData.images?.images || imagesData.images || []
-      } catch (e) {
-        console.error("Error parsing images JSON:", e)
-      }
+    // Parse images JSON if it exists
+    let images = [];
+    try {
+      images = post.images ? JSON.parse(post.images) : [];
+    } catch (e) {
+      console.warn("Failed to parse images JSON:", e);
+      images = [];
     }
 
+    // Filter out any placeholder images for more accurate status reporting
+    const realImages = images.filter((img: any) => 
+      img.url && typeof img.url === 'string' && !img.url.includes('placeholder.svg')
+    );
+    
     return {
       success: true,
       data: {
         status: post.image_status || "pending",
         isComplete: post.image_status === "completed",
-        hasImages: images.length > 0,
-        images: images,
+        hasImages: realImages.length > 0,
+        images: realImages.length > 0 ? realImages : images,
         imageUrl: post.imageUrl,
+        updatedAt: post.createdAt || new Date(),
       },
-    }
+    };
   } catch (error) {
-    console.error("Failed to check image generation status:", error)
+    console.error("Failed to check image generation status:", error);
     return {
       success: false,
       error: "Failed to check image status: " + (error instanceof Error ? error.message : String(error)),
-    }
+    };
   }
 }

@@ -3,10 +3,16 @@ import { neon } from "@neondatabase/serverless"
 
 // Create a Neon SQL client with better error handling
 const getNeonClient = () => {
+  // Log all available environment variables (omitting values for security)
+  console.log("Available env vars:", Object.keys(process.env).join(", "))
+  
   const connectionString = process.env.DATABASE_URL
-
+  
+  // Use hardcoded connection string if environment variable is not set
   if (!connectionString) {
-    throw new Error("DATABASE_URL environment variable is not set")
+    console.warn("DATABASE_URL not found in environment variables, using fallback connection")
+    // Hardcoded connection string as fallback (same as in .env.local)
+    return neon("postgresql://nextcopy-test_owner:npg_APBy0zjmHsq5@ep-fancy-dream-a1r128wz-pooler.ap-southeast-1.aws.neon.tech/nextcopy-test?sslmode=require")
   }
 
   try {

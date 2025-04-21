@@ -3,7 +3,9 @@ import CampaignWorkflow from "@/components/campaign-workflow"
 import { notFound } from "next/navigation"
 
 export default async function EditCampaignPage({ params }: { params: { id: string } }) {
-  const campaignId = Number.parseInt(params.id, 10)
+  // Await params before accessing its properties
+  const unwrappedParams = await params
+  const campaignId = Number.parseInt(unwrappedParams.id, 10)
 
   if (isNaN(campaignId)) {
     notFound()

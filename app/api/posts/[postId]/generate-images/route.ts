@@ -12,8 +12,9 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
     const searchParams = request.nextUrl.searchParams
     const numImages = searchParams.get("num_images") || "1"
     const imageStyle = searchParams.get("style") || "realistic"
+    const imageService = searchParams.get("image_service") || "" // Add support for image_service parameter
 
-    console.log(`API route: Generating ${numImages} images with style "${imageStyle}" for post ${postId}`)
+    console.log(`API route: Generating ${numImages} images with style "${imageStyle}" for post ${postId}${imageService ? ` using ${imageService}` : ''}`)
 
     // Call the FastAPI backend
     const fastApiUrl = process.env.FASTAPI_URL
@@ -25,7 +26,13 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
     }
 
     // Log the URL we're calling for debugging
-    const endpoint = `${fastApiUrl}/content/${postId}/generate_images_real?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}`
+    let endpoint = `${fastApiUrl}/content/${postId}/generate_images_real?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}`
+    
+    // Add image_service parameter if provided
+    if (imageService) {
+      endpoint += `&image_service=${encodeURIComponent(imageService)}`
+    }
+    
     console.log(`Calling FastAPI endpoint: ${endpoint}`)
 
     try {
