@@ -153,8 +153,32 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
     setIsGenerating(true)
 
     try {
-      // Call a new server action to fetch posts for this theme
-      const result = await fetchPostsForTheme(campaign.id, theme.id)
+      // Add retry logic with exponential backoff
+      const maxRetries = 3
+      let retryCount = 0
+      let success = false
+      let result
+
+      while (retryCount < maxRetries && !success) {
+        try {
+          // Call a new server action to fetch posts for this theme
+          result = await fetchPostsForTheme(campaign.id, theme.id)
+          success = true
+        } catch (retryError) {
+          retryCount++
+          console.log(`Retry attempt ${retryCount} after error:`, retryError)
+
+          // Exponential backoff: wait longer between each retry
+          if (retryCount < maxRetries) {
+            const delay = Math.pow(2, retryCount) * 1000 // 2s, 4s, 8s
+            await new Promise((resolve) => setTimeout(resolve, delay))
+          }
+        }
+      }
+
+      if (!success || !result) {
+        throw new Error(`Failed to fetch posts after ${maxRetries} retries`)
+      }
 
       if (result.success && result.data.length > 0) {
         console.log("Fetched posts from database:", result.data.length)
@@ -182,10 +206,14 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
       console.error("Error fetching posts:", error)
       toast({
         title: "Error",
-        description: "An unexpected error occurred while fetching posts",
+        description: "An unexpected error occurred while fetching posts. Trying to generate new content...",
         variant: "destructive",
       })
-      setIsPolling(false)
+
+      // If fetching fails, try to generate new content
+      if (!isPolling) {
+        startPollingForContent(theme.id)
+      }
     } finally {
       setIsGenerating(false)
     }

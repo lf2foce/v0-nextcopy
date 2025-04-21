@@ -422,7 +422,7 @@ export async function toggleCampaignActiveStatus(campaignId: number, isActive: b
 
     // Revalidate both the campaigns list and the specific campaign page
     revalidatePath("/campaigns")
-    revalidatePath(`/campaigns/${campaignId}`)
+    revalidatePath(`/campaigns/${updatedCampaign.campaignId}`)
 
     return { success: true, data: updatedCampaign }
   } catch (error) {
@@ -537,9 +537,7 @@ export async function postToSocialMedia(postId: number, platform: string, conten
     console.log(`Posting to ${platform} for post ID ${postId}`)
 
     // Call the API route - note we're not using content parameter anymore
-    const baseUrl = process.env.NEXT_PUBLIC_URL || "localhost:3000"
-    const protocol = baseUrl.includes("localhost") ? "http://" : "https://"
-    const response = await fetch(`${protocol}${baseUrl}/api/social/${platform}/post`, {
+    const response = await fetch(`https://nextcopy.vercel.app/api/social/${platform}/post`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

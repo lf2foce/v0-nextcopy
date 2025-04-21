@@ -29,7 +29,7 @@ export default function CampaignsPage() {
         const campaignsResult = await getAllCampaigns()
 
         if (campaignsResult.success) {
-          setCampaigns(campaignsResult.data || [])
+          setCampaigns(campaignsResult.data)
         } else {
           setError(campaignsResult.error || "Không thể tải chiến dịch")
         }

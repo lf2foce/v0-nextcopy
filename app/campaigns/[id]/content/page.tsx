@@ -21,7 +21,6 @@ import { useToast } from "@/hooks/use-toast"
 import { MultipleImagesDisplay } from "@/components/multiple-images-display"
 // First, import the new ImageViewerModal component
 import ImageViewerModal from "@/components/ui/image-viewer-modal"
-import { use } from "react"
 
 export default function CampaignContentPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -31,7 +30,6 @@ export default function CampaignContentPage({ params }: { params: { id: string }
   const [modalPost, setModalPost] = useState<any>(null)
   const [postingId, setPostingId] = useState<number | null>(null)
   const { toast } = useToast()
-  const unwrappedParams = use(params)
 
   // Add new states for the image viewer modal
   const [viewerImages, setViewerImages] = useState<any[]>([])
@@ -42,7 +40,7 @@ export default function CampaignContentPage({ params }: { params: { id: string }
     const loadCampaign = async () => {
       try {
         // Use the actual API function to get campaign data
-        const result = await getCampaign(Number.parseInt(unwrappedParams.id, 10))
+        const result = await getCampaign(Number.parseInt(params.id, 10))
         if (result.success && result.data) {
           setCampaign(result.data)
           console.log("Campaign data loaded:", result.data)
@@ -57,7 +55,7 @@ export default function CampaignContentPage({ params }: { params: { id: string }
     }
 
     loadCampaign()
-  }, [unwrappedParams.id])
+  }, [params.id])
 
   // Update the handlePostToFacebook function in the content page
   const handlePostToFacebook = async (postId: number, content: string) => {
@@ -235,7 +233,7 @@ export default function CampaignContentPage({ params }: { params: { id: string }
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div className="flex items-center gap-2">
           <Link
-            href={`/campaigns/${unwrappedParams.id}`}
+            href={`/campaigns/${params.id}`}
             className="flex items-center gap-1 py-2 px-4 bg-gray-200 border-2 border-black rounded-md hover:bg-gray-300"
           >
             <ArrowLeft size={16} />

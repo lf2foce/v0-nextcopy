@@ -12,9 +12,11 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
     const searchParams = request.nextUrl.searchParams
     const numImages = searchParams.get("num_images") || "1"
     const imageStyle = searchParams.get("style") || "realistic"
-    const imageService = searchParams.get("image_service") || "" // Add support for image_service parameter
+    const imageService = searchParams.get("image_service") || "ideogram"
 
-    console.log(`API route: Generating ${numImages} images with style "${imageStyle}" for post ${postId}${imageService ? ` using ${imageService}` : ''}`)
+    console.log(
+      `API route: Generating ${numImages} images with style "${imageStyle}" using service "${imageService}" for post ${postId}`,
+    )
 
     // Call the FastAPI backend
     const fastApiUrl = process.env.FASTAPI_URL
@@ -26,14 +28,12 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
     }
 
     // Log the URL we're calling for debugging
-    let endpoint = `${fastApiUrl}/content/${postId}/generate_images_real?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}`
-    
-    // Add image_service parameter if provided
-    if (imageService) {
-      endpoint += `&image_service=${encodeURIComponent(imageService)}`
-    }
-    
+    const endpoint = `${fastApiUrl}/content/${postId}/generate_images_real?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}&image_service=${encodeURIComponent(imageService)}`
     console.log(`Calling FastAPI endpoint: ${endpoint}`)
+
+    // Add a timeout to the fetch request
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
     try {
       const response = await fetch(endpoint, {
@@ -42,7 +42,10 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
           "Content-Type": "application/json",
           Accept: "application/json",
         },
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
 
       // Log the response status
       console.log(`FastAPI response status: ${response.status}`)
@@ -68,6 +71,21 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
         }
 
         console.error(`Error from FastAPI: ${errorMessage}`)
+
+        if (response.status === 500 && errorMessage.includes("Internal server error")) {
+          // Check if this is a service-specific error
+          const service = searchParams.get("image_service") || "ideogram"
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Service error: ${service} returned an internal server error. Try a different service.`,
+              serviceError: true,
+              service: service,
+            },
+            { status: 500 },
+          )
+        }
+
         return NextResponse.json({ success: false, error: errorMessage }, { status: response.status })
       }
 
@@ -154,6 +172,21 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
         }
       }
     } catch (fetchError) {
+      clearTimeout(timeoutId)
+
+      if (fetchError.name === "AbortError") {
+        console.error("Request timed out")
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Request timed out after 30 seconds. The service may be overloaded.`,
+            serviceError: true,
+            service: searchParams.get("image_service") || "ideogram",
+          },
+          { status: 408 },
+        )
+      }
+
       console.error("Network error when calling FastAPI:", fetchError)
       return NextResponse.json(
         {
