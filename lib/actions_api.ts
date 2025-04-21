@@ -437,16 +437,31 @@ export async function checkImageGenerationStatus(postId: number) {
     // Parse images JSON if it exists
     let images = [];
     try {
-      images = post.images ? JSON.parse(post.images) : [];
+      if (post.images) {
+        const parsedImages = JSON.parse(post.images);
+        // Handle different possible structures
+        if (Array.isArray(parsedImages)) {
+          images = parsedImages;
+        } else if (parsedImages.images && Array.isArray(parsedImages.images)) {
+          images = parsedImages.images;
+        } else if (typeof parsedImages === 'object') {
+          // If it's an object but not in expected format, try to convert to array
+          images = Object.values(parsedImages).filter(item => 
+            item && typeof item === 'object' && 'url' in item
+          );
+        }
+      }
     } catch (e) {
       console.warn("Failed to parse images JSON:", e);
       images = [];
     }
 
     // Filter out any placeholder images for more accurate status reporting
-    const realImages = images.filter((img: any) => 
-      img.url && typeof img.url === 'string' && !img.url.includes('placeholder.svg')
-    );
+    const realImages = Array.isArray(images) ? images.filter((img: any) => 
+      img && typeof img === 'object' && 
+      img.url && typeof img.url === 'string' && 
+      !img.url.includes('placeholder.svg')
+    ) : [];
     
     return {
       success: true,
