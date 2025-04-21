@@ -5,17 +5,7 @@ import type React from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
 import Image from "next/image"
 import type { Post } from "../campaign-workflow"
-import {
-  CheckCircle,
-  RefreshCw,
-  Loader2,
-  Check,
-  AlertCircle,
-  MinusCircle,
-  PlusCircle,
-  ChevronDown,
-  AlertTriangle,
-} from "lucide-react"
+import { CheckCircle, RefreshCw, Loader2, Check, AlertCircle, MinusCircle, PlusCircle, ChevronDown } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { checkImageGenerationStatus } from "@/lib/actions_api"
 
@@ -44,14 +34,6 @@ const IMAGE_STYLES = [
   { value: "oil_painting", label: "Oil Painting" },
 ]
 
-// Define available image services
-const IMAGE_SERVICES = [
-  { value: "ideogram", label: "Ideogram" },
-  { value: "gemini", label: "Gemini" },
-  { value: "dalle", label: "DALL-E" },
-  { value: "midjourney", label: "Midjourney" },
-]
-
 interface GenerateMultipleImagesProps {
   posts: Post[]
   onComplete: (posts: Post[]) => void
@@ -76,18 +58,12 @@ export default function GenerateMultipleImages({
   const [numImagesPerPost, setNumImagesPerPost] = useState<Record<string | number, number>>({})
   // Add state for image style per post
   const [imageStylePerPost, setImageStylePerPost] = useState<Record<string | number, string>>({})
-  // Add state for image service per post
-  const [imageServicePerPost, setImageServicePerPost] = useState<Record<string | number, string>>({})
   // Add state for dropdown visibility
-  const [openDropdowns, setOpenDropdowns] = useState<Record<string | number, string>>({})
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string | number, boolean>>({})
   // Add state to track which posts have completed image generation
   const [completedPosts, setCompletedPosts] = useState<Record<string | number, boolean>>({})
   // Add a refresh counter to force re-renders
   const [refreshCounter, setRefreshCounter] = useState(0)
-  // Add state for global image service selection
-  const [globalImageService, setGlobalImageService] = useState<string>("ideogram")
-  // Add state for tracking service errors:
-  const [serviceErrors, setServiceErrors] = useState<Record<string, boolean>>({})
   const { toast } = useToast()
 
   // Create refs for dropdowns
@@ -101,20 +77,17 @@ export default function GenerateMultipleImages({
     localPostsRef.current = localPosts
   }, [localPosts])
 
-  // Initialize numImagesPerPost, imageStylePerPost, and imageServicePerPost with default values
+  // Initialize numImagesPerPost and imageStylePerPost with default values
   useEffect(() => {
     const initialNumImages: Record<string | number, number> = {}
     const initialImageStyles: Record<string | number, string> = {}
-    const initialImageServices: Record<string | number, string> = {}
     posts.forEach((post) => {
       initialNumImages[post.id] = 1 // Default to 1 image per post
       initialImageStyles[post.id] = "realistic" // Default to realistic style
-      initialImageServices[post.id] = globalImageService // Default to global image service
     })
     setNumImagesPerPost(initialNumImages)
     setImageStylePerPost(initialImageStyles)
-    setImageServicePerPost(initialImageServices)
-  }, [posts, globalImageService])
+  }, [posts])
 
   // Function to increment number of images
   const incrementNumImages = (postId: string | number) => {
@@ -133,20 +106,16 @@ export default function GenerateMultipleImages({
   }
 
   // Function to toggle dropdown
-  const toggleDropdown = (postId: string | number, type: string, e: React.MouseEvent) => {
+  const toggleDropdown = (postId: string | number, e: React.MouseEvent) => {
     e.stopPropagation() // Prevent event bubbling
     setOpenDropdowns((prev) => {
       const newState = { ...prev }
       // Close all other dropdowns
       Object.keys(newState).forEach((key) => {
-        delete newState[key]
+        if (key !== String(postId)) newState[key] = false
       })
       // Toggle this dropdown
-      if (prev[postId] === type) {
-        delete newState[postId]
-      } else {
-        newState[postId] = type
-      }
+      newState[postId] = !prev[postId]
       return newState
     })
   }
@@ -182,57 +151,10 @@ export default function GenerateMultipleImages({
       [postId]: style,
     }))
     // Close the dropdown after selection
-    setOpenDropdowns({})
-  }
-
-  // Function to select image service
-  const selectImageService = (postId: string | number, service: string, e: React.MouseEvent) => {
-    e.stopPropagation() // Prevent the click from closing the dropdown immediately
-
-    // If this service has errors, show a warning toast
-    if (serviceErrors[service]) {
-      toast({
-        title: "Service Warning",
-        description: `The ${service} service is currently experiencing issues. You may want to try another service.`,
-        variant: "destructive",
-      })
-    }
-
-    setImageServicePerPost((prev) => ({
+    setOpenDropdowns((prev) => ({
       ...prev,
-      [postId]: service,
+      [postId]: false,
     }))
-    // Close the dropdown after selection
-    setOpenDropdowns({})
-  }
-
-  // Function to set global image service
-  const handleGlobalImageServiceChange = (service: string) => {
-    // If this service has errors, show a warning toast
-    if (serviceErrors[service]) {
-      toast({
-        title: "Service Warning",
-        description: `The ${service} service is currently experiencing issues. You may want to try another service.`,
-        variant: "destructive",
-      })
-    }
-
-    setGlobalImageService(service)
-
-    // Update all posts to use the new service
-    const updatedServices: Record<string | number, string> = {}
-    posts.forEach((post) => {
-      updatedServices[post.id] = service
-    })
-    setImageServicePerPost(updatedServices)
-
-    // Close any open dropdowns
-    setOpenDropdowns({})
-
-    toast({
-      title: "Image service updated",
-      description: `All posts will now use ${IMAGE_SERVICES.find((s) => s.value === service)?.label || service} for image generation.`,
-    })
   }
 
   // Function to force a UI refresh
@@ -618,11 +540,8 @@ export default function GenerateMultipleImages({
         // Get the number of images and style to generate for this post
         const numImages = numImagesPerPost[postId] || 1
         const imageStyle = imageStylePerPost[postId] || "realistic"
-        const imageService = imageServicePerPost[postId] || globalImageService
 
-        console.log(
-          `Generating ${numImages} images with style "${imageStyle}" using service "${imageService}" for post ${postId}`,
-        )
+        console.log(`Generating ${numImages} images with style "${imageStyle}" for post ${postId}`)
 
         // Skip if this post is already being polled
         if (pollingPosts[postId]) {
@@ -630,50 +549,17 @@ export default function GenerateMultipleImages({
           return { success: true, status: "already_polling" }
         }
 
-        // Call the actual API to generate images with the number of images, style, and service
-        const result = await generateImagesForPost(postId, numImages, imageStyle, imageService)
+        // Call the actual API to generate images with the number of images and style
+        const result = await generateImagesForPost(postId, numImages, imageStyle)
 
         if (!result.success) {
           const errorMessage = result.error || "Failed to generate images from API"
           console.error("Failed to generate images:", errorMessage)
-
-          // Check if this is a service error
-          if (result.serviceError && result.service) {
-            // Mark this service as having errors
-            setServiceErrors((prev) => ({
-              ...prev,
-              [result.service]: true,
-            }))
-
-            // If the current service is having issues, suggest switching to Ideogram
-            if (result.service !== "ideogram") {
-              toast({
-                title: `Service Error: ${result.service}`,
-                description: `${errorMessage} Automatically trying with Ideogram instead.`,
-                variant: "warning",
-              })
-
-              // Update the service for this post to Ideogram
-              setImageServicePerPost((prev) => ({
-                ...prev,
-                [postId]: "ideogram",
-              }))
-
-              // Try again with Ideogram after a short delay
-              setTimeout(() => {
-                generateImagesForPost(postId, numImages, imageStyle, "ideogram")
-              }, 1000)
-
-              return { success: false, error: errorMessage, serviceError: true, service: result.service }
-            }
-          }
-
           toast({
             title: "Error",
             description: `Error for post ${postId}: ${errorMessage}`,
             variant: "destructive",
           })
-
           // Store the error for this specific post
           setErrors((prev) => ({ ...prev, [postId]: errorMessage }))
           return { success: false, error: errorMessage }
@@ -683,7 +569,7 @@ export default function GenerateMultipleImages({
         if (result.data?.status === "processing") {
           toast({
             title: "Generating images",
-            description: `Generating ${numImages} ${imageStyle} style images using ${imageService} for post ${postId}. This may take a minute...`,
+            description: `Generating ${numImages} ${imageStyle} style images for post ${postId}. This may take a minute...`,
           })
 
           // Start polling for this post
@@ -707,7 +593,7 @@ export default function GenerateMultipleImages({
           if (result.success) {
             toast({
               title: "Generating images",
-              description: `Generating ${numImages} ${imageStyle} style images using ${imageService} for post ${postId}. This may take a minute...`,
+              description: `Generating ${numImages} ${imageStyle} style images for post ${postId}. This may take a minute...`,
             })
 
             // Start polling for this post
@@ -839,9 +725,6 @@ export default function GenerateMultipleImages({
           } else {
             successCount++
           }
-        } else if (result.retrying) {
-          // Skip counting if we're retrying with a different service
-          continue
         } else {
           errorCount++
         }
@@ -1155,64 +1038,11 @@ export default function GenerateMultipleImages({
         <p className="text-gray-700">Generate and select images for your posts</p>
       </div>
 
-      {/* Service error warning banner */}
-      {Object.keys(serviceErrors).length > 0 && (
-        <div className="bg-amber-100 border-4 border-amber-500 rounded-md p-4 mb-4">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={20} />
-            <div>
-              <h3 className="font-bold text-amber-800">Service Issues Detected</h3>
-              <p className="text-amber-700">
-                The following image services are currently experiencing issues:
-                {Object.keys(serviceErrors).map((service) => (
-                  <span key={service} className="font-semibold">
-                    {" "}
-                    {service}
-                  </span>
-                ))}
-                . Please use an alternative service like Ideogram.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="flex justify-between items-center">
         <p className="text-sm">
           <span className="font-bold">{localPosts.length}</span> posts to generate images for
         </p>
         <div className="flex gap-2">
-          {/* Global image service selector */}
-          <div className="relative" ref={(el) => (dropdownRefs.current["global"] = el)}>
-            <button
-              onClick={(e) => toggleDropdown("global", "service", e)}
-              className="py-2 px-4 bg-blue-400 border-2 border-black rounded-md font-medium hover:bg-blue-500 flex items-center gap-2"
-            >
-              <span>Service: {IMAGE_SERVICES.find((s) => s.value === globalImageService)?.label || "Ideogram"}</span>
-              <ChevronDown size={16} className={openDropdowns["global"] === "service" ? "transform rotate-180" : ""} />
-            </button>
-
-            {openDropdowns["global"] === "service" && (
-              <div className="absolute z-20 mt-1 w-40 bg-white border-2 border-black rounded-md shadow-lg">
-                {IMAGE_SERVICES.map((service) => (
-                  <button
-                    key={service.value}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleGlobalImageServiceChange(service.value)
-                    }}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
-                      globalImageService === service.value ? "bg-yellow-100 font-medium" : ""
-                    } ${serviceErrors[service.value] ? "text-red-500" : ""}`}
-                  >
-                    {service.label}
-                    {serviceErrors[service.value] && " ⚠️"}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
           <button
             onClick={manualForceUIRefresh}
             className="py-2 px-4 bg-blue-400 border-2 border-black rounded-md font-medium hover:bg-blue-500"
@@ -1270,12 +1100,9 @@ export default function GenerateMultipleImages({
           const hasError = errors[post.id]
           const numImages = numImagesPerPost[post.id] || 1
           const imageStyle = imageStylePerPost[post.id] || "realistic"
-          const imageService = imageServicePerPost[post.id] || globalImageService
-          const isStyleDropdownOpen = openDropdowns[post.id] === "style"
-          const isServiceDropdownOpen = openDropdowns[post.id] === "service"
+          const isDropdownOpen = openDropdowns[post.id] || false
           const isGeneratingOrPolling = isGeneratingThisPost || isPollingThisPost
           const isCompleted = completedPosts[post.id] === true
-          const hasServiceError = serviceErrors[imageService] === true
 
           return (
             <div
@@ -1313,17 +1140,17 @@ export default function GenerateMultipleImages({
                     </div>
 
                     {/* Style selector dropdown */}
-                    <div className="relative" ref={(el) => (dropdownRefs.current[`${post.id}-style`] = el)}>
+                    <div className="relative" ref={(el) => (dropdownRefs.current[post.id] = el)}>
                       <button
-                        onClick={(e) => toggleDropdown(post.id, "style", e)}
+                        onClick={(e) => toggleDropdown(post.id, e)}
                         disabled={isGeneratingOrPolling}
                         className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 py-1 text-sm w-32 disabled:opacity-50"
                       >
                         <span>{IMAGE_STYLES.find((style) => style.value === imageStyle)?.label || "Realistic"}</span>
-                        <ChevronDown size={14} className={isStyleDropdownOpen ? "transform rotate-180" : ""} />
+                        <ChevronDown size={14} className={isDropdownOpen ? "transform rotate-180" : ""} />
                       </button>
 
-                      {isStyleDropdownOpen && (
+                      {isDropdownOpen && (
                         <div className="absolute z-10 mt-1 w-40 bg-white border-2 border-black rounded-md shadow-lg">
                           {IMAGE_STYLES.map((style) => (
                             <button
@@ -1334,40 +1161,6 @@ export default function GenerateMultipleImages({
                               }`}
                             >
                               {style.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Image service selector dropdown */}
-                    <div className="relative" ref={(el) => (dropdownRefs.current[`${post.id}-service`] = el)}>
-                      <button
-                        onClick={(e) => toggleDropdown(post.id, "service", e)}
-                        disabled={isGeneratingOrPolling}
-                        className={`flex items-center justify-between gap-1 bg-white border-2 ${
-                          hasServiceError ? "border-red-500" : "border-black"
-                        } rounded-md px-3 py-1 text-sm w-32 disabled:opacity-50`}
-                      >
-                        <span>
-                          {IMAGE_SERVICES.find((service) => service.value === imageService)?.label || "Ideogram"}
-                          {hasServiceError && " ⚠️"}
-                        </span>
-                        <ChevronDown size={14} className={isServiceDropdownOpen ? "transform rotate-180" : ""} />
-                      </button>
-
-                      {isServiceDropdownOpen && (
-                        <div className="absolute z-10 mt-1 w-40 bg-white border-2 border-black rounded-md shadow-lg">
-                          {IMAGE_SERVICES.map((service) => (
-                            <button
-                              key={service.value}
-                              onClick={(e) => selectImageService(post.id, service.value, e)}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
-                                imageService === service.value ? "bg-yellow-100 font-medium" : ""
-                              } ${serviceErrors[service.value] ? "text-red-500" : ""}`}
-                            >
-                              {service.label}
-                              {serviceErrors[service.value] && " ⚠️"}
                             </button>
                           ))}
                         </div>
@@ -1404,8 +1197,7 @@ export default function GenerateMultipleImages({
                     <span className="font-medium">
                       Generating {numImages}{" "}
                       {IMAGE_STYLES.find((style) => style.value === imageStyle)?.label || "Realistic"} style image
-                      {numImages > 1 ? "s" : ""} using{" "}
-                      {IMAGE_SERVICES.find((service) => service.value === imageService)?.label || "Ideogram"}...
+                      {numImages > 1 ? "s" : ""}...
                     </span>
                     {isPollingThisPost && (
                       <p className="text-sm text-gray-500 mt-2">This may take a minute. Please wait...</p>
@@ -1416,30 +1208,6 @@ export default function GenerateMultipleImages({
                     <AlertCircle size={32} className="text-red-500 mb-2" />
                     <p className="font-medium text-red-700 text-center">Error generating images</p>
                     <p className="text-sm text-red-600 text-center mt-2">{hasError}</p>
-
-                    {/* Add this button */}
-                    <button
-                      onClick={() => {
-                        // Switch to Ideogram if not already using it
-                        if (imageServicePerPost[post.id] !== "ideogram") {
-                          setImageServicePerPost((prev) => ({
-                            ...prev,
-                            [post.id]: "ideogram",
-                          }))
-                          handleRegenerateImages(post.id)
-                        } else {
-                          // If already using Ideogram, try a different service
-                          setImageServicePerPost((prev) => ({
-                            ...prev,
-                            [post.id]: "dalle",
-                          }))
-                          handleRegenerateImages(post.id)
-                        }
-                      }}
-                      className="mt-4 py-2 px-3 bg-blue-400 border-2 border-black rounded-md hover:bg-blue-500 text-sm"
-                    >
-                      Try {imageServicePerPost[post.id] === "ideogram" ? "DALL-E" : "Ideogram"} Instead
-                    </button>
                   </div>
                 ) : hasGeneratedImages ? (
                   <div className="space-y-4">

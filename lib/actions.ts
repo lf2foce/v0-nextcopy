@@ -422,7 +422,7 @@ export async function toggleCampaignActiveStatus(campaignId: number, isActive: b
 
     // Revalidate both the campaigns list and the specific campaign page
     revalidatePath("/campaigns")
-    revalidatePath(`/campaigns/${updatedCampaign.campaignId}`)
+    revalidatePath(`/campaigns/${campaignId}`)
 
     return { success: true, data: updatedCampaign }
   } catch (error) {

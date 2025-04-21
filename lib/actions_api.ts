@@ -1,265 +1,108 @@
-// Add a new function to handle API requests with retry logic
+"use server"
+import { db } from "./db"
+import { themes, contentPosts } from "./schema"
+import { eq } from "drizzle-orm"
+import { updateCampaignStep, getCampaignSteps } from "./actions"
+import type { Theme as ThemeType } from "../components/campaign-workflow"
+import type { Campaign as CampaignType } from "../components/campaign-workflow"
+import type { NewTheme } from "./schema"
 
-// Add this helper function at the top of the file
-async function fetchWithRetry(url: string, options: RequestInit = {}, maxRetries = 3) {
-  let retries = 0
+// Theme ideas for different types of campaigns - kept for mock generation
+const themeIdeas = [
+  {
+    name: "Bold & Vibrant",
+    description: "High contrast colors with bold typography for maximum impact",
+  },
+  {
+    name: "Minimalist",
+    description: "Clean, simple designs with plenty of white space",
+  },
+  {
+    name: "Retro Wave",
+    description: "80s inspired neon colors and geometric patterns",
+  },
+  {
+    name: "Nature Inspired",
+    description: "Organic shapes and earthy color palette",
+  },
+  {
+    name: "Elegant & Sophisticated",
+    description: "Refined aesthetics with luxury appeal and subtle details",
+  },
+  {
+    name: "Playful & Fun",
+    description: "Whimsical elements with bright colors and casual typography",
+  },
+  {
+    name: "Tech & Modern",
+    description: "Sleek, futuristic design with cutting-edge aesthetics",
+  },
+  {
+    name: "Vintage Charm",
+    description: "Classic elements with a nostalgic feel and timeless appeal",
+  },
+  {
+    name: "Urban Street",
+    description: "Gritty textures with bold graphics and contemporary edge",
+  },
+  {
+    name: "Handcrafted",
+    description: "Artisanal feel with hand-drawn elements and organic textures",
+  },
+]
 
-  while (retries < maxRetries) {
-    try {
-      const response = await fetch(url, options)
+// Function to generate random themes based on campaign details - kept for testing
+const generateRandomThemes = (campaign: CampaignType, count = 4): ThemeType[] => {
+  // Shuffle the theme ideas array
+  const shuffled = [...themeIdeas].sort(() => 0.5 - Math.random())
 
-      // If we get a rate limit error (429), wait and retry
-      if (response.status === 429) {
-        retries++
-        console.log(`Rate limited (429). Retry attempt ${retries} of ${maxRetries}`)
+  // Take the first 'count' items
+  const selectedThemes = shuffled.slice(0, count)
 
-        // Get retry-after header or use exponential backoff
-        const retryAfter = response.headers.get("Retry-After")
-        const delayMs = retryAfter ? Number.parseInt(retryAfter) * 1000 : Math.pow(2, retries) * 1000
-
-        await new Promise((resolve) => setTimeout(resolve, delayMs))
-        continue
-      }
-
-      // For other non-200 responses, try to parse error message
-      if (!response.ok) {
-        const contentType = response.headers.get("Content-Type") || ""
-
-        if (contentType.includes("application/json")) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || `HTTP error ${response.status}`)
-        } else {
-          // Handle text responses (like "Too Many Requests")
-          const errorText = await response.text()
-          throw new Error(`HTTP error ${response.status}: ${errorText.substring(0, 100)}`)
-        }
-      }
-
-      // Success case - try to parse as JSON
-      const contentType = response.headers.get("Content-Type") || ""
-      if (contentType.includes("application/json")) {
-        return await response.json()
-      } else {
-        // Handle non-JSON successful responses
-        const text = await response.text()
-        try {
-          // Try to parse as JSON anyway in case Content-Type is wrong
-          return JSON.parse(text)
-        } catch (e) {
-          // Return as text if not JSON
-          return { text }
-        }
-      }
-    } catch (error) {
-      retries++
-
-      // If it's the last retry, throw the error
-      if (retries >= maxRetries) {
-        throw error
-      }
-
-      // Otherwise wait and retry
-      console.log(`Request failed. Retry attempt ${retries} of ${maxRetries}:`, error)
-      await new Promise((resolve) => setTimeout(resolve, Math.pow(2, retries) * 1000))
-    }
-  }
-
-  throw new Error(`Failed after ${maxRetries} retries`)
+  // Map to Theme type with campaign ID
+  return selectedThemes.map((theme, index) => ({
+    id: `mock-${Date.now()}-${index}`,
+    name: theme.name,
+    description: theme.description,
+    campaignId: campaign.id,
+  }))
 }
 
-export async function generateImagesForPost(
-  postId: number,
-  numImages = 1,
-  imageStyle = "realistic",
-  imageService = "ideogram",
-) {
+// Generate themes for a campaign - updated to use external API
+export async function generateThemes(campaignId: number, themesData?: ThemeType[], useMock = false) {
+  console.log("Server action: generateThemes called with campaignId:", campaignId)
+
   try {
-    const apiUrl = `/api/posts/${postId}/generate-images?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}&image_service=${encodeURIComponent(imageService)}`
+    // If useMock is true or themesData is provided, use the mock generation
+    if (useMock || themesData) {
+      console.log("Using mock theme generation")
 
-    console.log(`Calling API endpoint: ${apiUrl}`)
+      // First, delete all existing themes for this campaign
+      await db.delete(themes).where(eq(themes.campaignId, campaignId))
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      const themesToInsert: NewTheme[] = (themesData || []).map((theme) => ({
+        campaignId,
+        title: theme.name,
+        story: theme.description,
+        isSelected: false,
+        status: "pending",
+      }))
 
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      signal: controller.signal,
-    })
+      console.log("Inserting themes:", themesToInsert)
+      const insertedThemes = await db.insert(themes).values(themesToInsert).returning()
+      console.log("Inserted themes:", insertedThemes)
 
-    clearTimeout(timeoutId)
+      // Update campaign step to Generate Theme (2) - no change needed here
+      const CAMPAIGN_STEPS = await getCampaignSteps()
+      await updateCampaignStep(campaignId, CAMPAIGN_STEPS.GENERATE_THEME)
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      let errorData
-      try {
-        errorData = JSON.parse(errorText)
-      } catch (e) {
-        errorData = { detail: errorText }
-      }
-
-      console.error(`Error response (${response.status}):`, errorData)
-
-      // Check if this is a service error
-      if (response.status === 500 && errorData.serviceError) {
-        return {
-          success: false,
-          error: errorData.error || `Service error: ${imageService} is currently unavailable`,
-          serviceError: true,
-          service: imageService,
-        }
-      }
-
-      return {
-        success: false,
-        error: errorData.detail || `API error: ${response.status} ${response.statusText}`,
-      }
-    }
-
-    const data = await response.json()
-    console.log("API response data:", data)
-
-    // Handle processing status
-    if (data.data?.status === "processing") {
-      return { success: true, data: data.data }
-    }
-
-    if (!data.data?.images && !data.images) {
-      return { success: false, error: "No images were returned from API" }
-    }
-
-    return { success: true, data }
-  } catch (error) {
-    console.error("Network error in generateImagesForPost:", error)
-    if (error.name === "AbortError") {
-      return {
-        success: false,
-        error: "Request timed out after 30 seconds",
-        serviceError: true,
-        service: imageService,
-      }
-    }
-    return { success: false, error: `Network error: ${error.message}` }
-  }
-}
-
-export async function checkImageGenerationStatus(postId: number) {
-  try {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
-
-    const response = await fetch(`/api/posts/${postId}/image-generation-status`, {
-      signal: controller.signal,
-    })
-
-    clearTimeout(timeoutId)
-
-    if (!response.ok) {
-      console.error("Error checking image generation status:", response.statusText)
-      return {
-        success: false,
-        error: `Failed to check status: ${response.status} ${response.statusText}`,
-        status: "error",
-      }
-    }
-
-    const data = await response.json()
-    return {
-      success: true,
-      status: data.status,
-      message: data.message,
-      data: data,
-    }
-  } catch (error) {
-    console.error("Error checking image generation status:", error)
-    if (error.name === "AbortError") {
-      return {
-        success: false,
-        error: "Request timed out after 15 seconds",
-        status: "error",
-      }
-    }
-    return {
-      success: false,
-      error: `Network error: ${error.message}`,
-      status: "error",
-    }
-  }
-}
-
-// Update the checkThemePostStatus function to use fetchWithRetry
-export async function checkThemePostStatus(themeId: number) {
-  try {
-    console.log(`Checking theme post status for theme ${themeId}`)
-
-    // Use the new fetchWithRetry function
-    const data = await fetchWithRetry(`/api/copy/themes/${themeId}/status`)
-
-    return {
-      success: true,
-      data: {
-        isReady: data.data?.post_status === "ready" || false,
-        posts: data.data?.posts || [],
-      },
-    }
-  } catch (error) {
-    console.error("Failed to check theme post status:", error)
-    return {
-      success: false,
-      error: "Failed to check theme post status: " + (error instanceof Error ? error.message : String(error)),
-    }
-  }
-}
-
-// Find the generateThemes function and fix the error where 'e' is being treated as a function
-// Add this function if it doesn't exist or fix it if it does
-
-export async function generateThemes(campaignId: number, themesData?: any[]) {
-  try {
-    console.log(`Generating themes for campaign ${campaignId}`)
-
-    // If themesData is provided, use it directly
-    if (themesData && Array.isArray(themesData)) {
-      console.log(`Using provided themes data: ${themesData.length} themes`)
-
-      // Make sure we're working with the database
-      const { db } = await import("./db")
-      const { themes } = await import("./schema")
-
-      // First, check if themes already exist for this campaign
-      const existingThemes = await db.query.themes.findMany({
-        where: (theme, { eq }) => eq(theme.campaignId, campaignId),
-      })
-
-      if (existingThemes.length > 0) {
-        console.log(`Found ${existingThemes.length} existing themes for campaign ${campaignId}`)
-        return { success: true, data: existingThemes }
-      }
-
-      // Insert the provided themes into the database
-      const insertedThemes = await db
-        .insert(themes)
-        .values(
-          themesData.map((theme) => ({
-            campaignId,
-            title: theme.name || theme.title || "Theme",
-            story: theme.description || theme.story || "",
-            isSelected: false,
-            status: "pending",
-            post_status: "pending",
-          })),
-        )
-        .returning()
-
-      console.log(`Inserted ${insertedThemes.length} themes into database`)
       return { success: true, data: insertedThemes }
     }
 
-    // If no themesData provided, try to call the external API
+    // Use the external API via our proxy endpoint
+    console.log("Fetching themes from external API")
     try {
-      const response = await fetch(`/api/copy/themes/generate`, {
+      const response = await fetch("https://nextcopy.vercel.app/api/copy/themes/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -268,155 +111,340 @@ export async function generateThemes(campaignId: number, themesData?: any[]) {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`Error from themes API: ${response.status} ${response.statusText}`, errorText)
-        return {
-          success: false,
-          error: `Failed to generate themes: ${response.status} ${response.statusText}`,
+        // Try to get error details - first as JSON, then as text
+        let errorMessage = `External API error: ${response.status} ${response.statusText}`
+
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorMessage
+        } catch (jsonError) {
+          // If JSON parsing fails, try to get the response as text
+          try {
+            const errorText = await response.text()
+            if (errorText) {
+              errorMessage = `${errorMessage} - ${errorText.substring(0, 100)}`
+            }
+          } catch (textError) {
+            // If even text extraction fails, use the default error message
+          }
         }
+
+        console.error("API error:", errorMessage)
+        throw new Error(errorMessage)
       }
 
-      const data = await response.json()
-      return data
-    } catch (error) {
-      console.error("Error calling themes API:", error)
-
-      // Generate mock themes as fallback
-      const mockThemes = [
-        {
-          campaignId,
-          title: "Bold & Vibrant",
-          story: "High contrast colors with bold typography for maximum impact",
-          isSelected: false,
-          status: "pending",
-          post_status: "pending",
-        },
-        {
-          campaignId,
-          title: "Minimalist",
-          story: "Clean, simple designs with plenty of white space",
-          isSelected: false,
-          status: "pending",
-          post_status: "pending",
-        },
-        {
-          campaignId,
-          title: "Retro Wave",
-          story: "80s inspired neon colors and geometric patterns",
-          isSelected: false,
-          status: "pending",
-          post_status: "pending",
-        },
-      ]
-
-      // Try to insert mock themes into database
+      // Try to parse the response as JSON with better error handling
       try {
-        const { db } = await import("./db")
-        const { themes } = await import("./schema")
+        const apiResult = await response.json()
 
-        const insertedThemes = await db.insert(themes).values(mockThemes).returning()
-
-        return {
-          success: true,
-          data: insertedThemes,
-          warning: "Used fallback themes due to API error",
+        if (!apiResult.success) {
+          throw new Error(apiResult.error || "API returned unsuccessful response")
         }
-      } catch (dbError) {
-        console.error("Database error when inserting fallback themes:", dbError)
-        return {
-          success: true,
-          data: mockThemes,
-          warning: "Using mock themes (not saved to database)",
+
+        // Process the themes from the API
+        const apiThemes = apiResult.data
+
+        // First, delete all existing themes for this campaign
+        await db.delete(themes).where(eq(themes.campaignId, campaignId))
+
+        // Map API themes to our database schema
+        const themesToInsert: NewTheme[] = apiThemes.map((theme: any) => ({
+          campaignId,
+          title: theme.name || theme.title,
+          story: theme.description || theme.story,
+          isSelected: false,
+          status: "pending",
+          post_status: theme.post_status || "pending", // Add post_status field
+        }))
+
+        console.log("Inserting themes from API:", themesToInsert)
+        const insertedThemes = await db.insert(themes).values(themesToInsert).returning()
+        console.log("Inserted themes:", insertedThemes)
+
+        // Update campaign step to Generate Theme (2)
+        const CAMPAIGN_STEPS = await getCampaignSteps()
+        await updateCampaignStep(campaignId, CAMPAIGN_STEPS.GENERATE_THEME)
+
+        return { success: true, data: insertedThemes }
+      } catch (parseError) {
+        console.error("Error parsing API response:", parseError)
+
+        // Try to get the response body as text for better error reporting
+        try {
+          const responseText = await response.text()
+          console.error("Response body:", responseText.substring(0, 200))
+          throw new Error(
+            `Failed to parse API response: ${parseError.message}. Response starts with: ${responseText.substring(0, 50)}...`,
+          )
+        } catch (textError) {
+          throw new Error(`Failed to parse API response: ${parseError.message}`)
         }
       }
+    } catch (fetchError) {
+      console.error("Fetch error when calling external API:", fetchError)
+      throw new Error(`Failed to connect to external API: ${fetchError.message}`)
     }
   } catch (error) {
-    console.error("Error in generateThemes:", error)
+    console.error("Failed to generate themes:", error)
     return {
       success: false,
-      error: `Failed to generate themes: ${error instanceof Error ? error.message : String(error)}`,
+      error: "Failed to generate themes: " + (error instanceof Error ? error.message : String(error)),
     }
   }
 }
 
-// Add or fix the selectTheme function to prevent "e is not a function" error
-
+// Select a theme for a campaign - updated to rely solely on external API
 export async function selectTheme(themeId: number) {
   try {
-    console.log(`Selecting theme ${themeId}`)
+    console.log(`Selecting theme ${themeId} via external API`)
 
-    // Call the external API
-    try {
-      const response = await fetch(`/api/copy/themes/select`, {
+    // Use the external API via our proxy endpoint
+    const response = await fetch("https://nextcopy.vercel.app/api/copy/themes/select", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ themeId }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`API error (${response.status}):`, errorText)
+
+      // Try to parse as JSON if possible
+      let errorData = null
+      try {
+        errorData = JSON.parse(errorText)
+      } catch (e) {
+        // Not JSON, use text as is
+      }
+
+      throw new Error(errorData?.error || `Failed to select theme from API: ${response.status} ${response.statusText}`)
+    }
+
+    // Process the API response
+    const apiResult = await response.json()
+
+    if (!apiResult.success) {
+      throw new Error(apiResult.error || "API returned unsuccessful response")
+    }
+
+    console.log("Theme selected via API:", apiResult.data)
+
+    // Update campaign step to Generate Post (now 3 instead of 4)
+    // Get the theme to find its campaignId
+    const [themeData] = await db.select().from(themes).where(eq(themes.id, themeId)).limit(1)
+
+    if (themeData) {
+      const campaignId = themeData.campaignId
+      const CAMPAIGN_STEPS = await getCampaignSteps()
+      await updateCampaignStep(campaignId, CAMPAIGN_STEPS.GENERATE_POST)
+
+      // Update the theme status in our database to reflect the selection
+      await db
+        .update(themes)
+        .set({
+          isSelected: true,
+          status: "selected",
+        })
+        .where(eq(themes.id, themeId))
+    }
+
+    return {
+      success: true,
+      data: apiResult.data,
+      themeId: themeId,
+    }
+  } catch (error) {
+    console.error("Failed to select theme:", error)
+    return {
+      success: false,
+      error: "Failed to select theme: " + (error instanceof Error ? error.message : String(error)),
+    }
+  }
+}
+
+// Function to check theme post status - FIXED to properly check post_status column
+export async function checkThemePostStatus(themeId: number) {
+  try {
+    // Get the theme from the database
+    const [themeData] = await db.select().from(themes).where(eq(themes.id, themeId)).limit(1)
+
+    if (!themeData) {
+      return {
+        success: false,
+        error: "Theme not found",
+      }
+    }
+
+    // Check if the post_status is "ready" - this is the key indicator
+    const isReady = themeData.post_status === "ready"
+
+    // If the theme is ready, fetch the posts
+    let posts = []
+    if (isReady) {
+      posts = await db.select().from(contentPosts).where(eq(contentPosts.themeId, themeId))
+    }
+
+    return {
+      success: true,
+      data: {
+        status: themeData.post_status || "pending",
+        posts: posts,
+        isReady: isReady,
+      },
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: "Failed to check theme post status: " + (error instanceof Error ? error.message : String(error)),
+    }
+  }
+}
+
+// Update the generateImagesForPost function to handle async generation and style
+export async function generateImagesForPost(postId: number, numImages = 1, imageStyle = "realistic") {
+  try {
+    console.log(`Generating ${numImages} images with style "${imageStyle}" for post ${postId}`)
+
+    // Call our API route that will call the FastAPI backend
+    const response = await fetch(
+      `https://nextcopy.vercel.app/api/posts/${postId}/generate-images?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}`,
+      {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ themeId }),
-      })
+      },
+    )
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`Error from theme selection API: ${response.status} ${response.statusText}`, errorText)
+    // Handle non-JSON responses better
+    if (!response.ok) {
+      let errorMessage = `Failed to generate images: ${response.status} ${response.statusText}`
 
-        // If API fails, try to update the database directly
-        return await updateThemeSelectionInDatabase(themeId)
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.error || errorMessage
+      } catch (jsonError) {
+        // If JSON parsing fails, try to get the response as text
+        try {
+          const errorText = await response.text()
+          if (errorText) {
+            errorMessage = `${errorMessage} - ${errorText.substring(0, 100)}`
+          }
+        } catch (textError) {
+          // If even text extraction fails, use the default error message
+        }
       }
 
-      const data = await response.json()
-      return data
-    } catch (error) {
-      console.error("Error calling theme selection API:", error)
+      console.error("Error generating images:", errorMessage)
+      return {
+        success: false,
+        error: errorMessage,
+      }
+    }
 
-      // If API call fails, update the database directly
-      return await updateThemeSelectionInDatabase(themeId)
+    // Parse the successful response
+    try {
+      const result = await response.json()
+      console.log("API response for image generation:", result)
+
+      // Check if this is a processing response (async generation started)
+      if (result.data?.status === "processing") {
+        return {
+          success: true,
+          data: {
+            status: "processing",
+            message: result.data.message || "Image generation started in background",
+          },
+        }
+      }
+
+      // If we have immediate results (unlikely but possible)
+      if (result.data?.images && Array.isArray(result.data.images) && result.data.images.length > 0) {
+        // Update the post with the new images
+        try {
+          const { updatePostImages } = await import("./actions")
+          const imageData = result.data.images
+
+          const formattedData = {
+            images: imageData.map((img: any, idx: number) => ({
+              ...img,
+              isSelected: true,
+              order: idx,
+            })),
+          }
+
+          await updatePostImages([
+            {
+              id: postId,
+              image: imageData[0]?.url || "",
+              imagesJson: JSON.stringify(formattedData),
+            },
+          ])
+        } catch (dbError) {
+          console.error("Error updating post with new images:", dbError)
+        }
+      }
+
+      return { success: true, data: result.data }
+    } catch (parseError) {
+      console.error("Error parsing JSON response:", parseError)
+      return {
+        success: false,
+        error: `Failed to parse response: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+      }
     }
   } catch (error) {
-    console.error("Error in selectTheme:", error)
+    console.error("Failed to generate images for post:", error)
     return {
       success: false,
-      error: `Failed to select theme: ${error instanceof Error ? error.message : String(error)}`,
+      error: "Failed to generate images: " + (error instanceof Error ? error.message : String(error)),
     }
   }
 }
 
-// Helper function to update theme selection in database
-async function updateThemeSelectionInDatabase(themeId: number) {
+// Add this function to check image generation status for a post
+export async function checkImageGenerationStatus(postId: number) {
   try {
-    const { db } = await import("./db")
-    const { themes } = await import("./schema")
-    const { eq } = await import("drizzle-orm")
+    console.log(`Checking image generation status for post ${postId}`)
 
-    // Get the theme to find its campaignId
-    const [theme] = await db.select().from(themes).where(eq(themes.id, themeId)).limit(1)
+    // Get the post from the database to check its image_status
+    const [post] = await db.select().from(contentPosts).where(eq(contentPosts.id, postId)).limit(1)
 
-    if (!theme) {
-      return { success: false, error: "Theme not found" }
+    if (!post) {
+      return {
+        success: false,
+        error: "Post not found",
+      }
     }
 
-    // Reset all themes for this campaign to not selected
-    await db
-      .update(themes)
-      .set({ isSelected: false, status: "discarded" })
-      .where(eq(themes.campaignId, theme.campaignId))
-
-    // Set the selected theme
-    const [updatedTheme] = await db
-      .update(themes)
-      .set({ isSelected: true, status: "selected" })
-      .where(eq(themes.id, themeId))
-      .returning()
+    // Return the current status and any images if they exist
+    let images = []
+    if (post.images) {
+      try {
+        const imagesData = JSON.parse(post.images)
+        images = imagesData.images?.images || imagesData.images || []
+      } catch (e) {
+        console.error("Error parsing images JSON:", e)
+      }
+    }
 
     return {
       success: true,
-      data: updatedTheme,
-      message: "Theme selected successfully (database update)",
+      data: {
+        status: post.image_status || "pending",
+        isComplete: post.image_status === "completed",
+        hasImages: images.length > 0,
+        images: images,
+        imageUrl: post.imageUrl,
+      },
     }
-  } catch (dbError) {
-    console.error("Database error when selecting theme:", dbError)
+  } catch (error) {
+    console.error("Failed to check image generation status:", error)
     return {
       success: false,
-      error: `Database error: ${dbError instanceof Error ? dbError.message : String(dbError)}`,
+      error: "Failed to check image status: " + (error instanceof Error ? error.message : String(error)),
     }
   }
 }
