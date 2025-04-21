@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import type { Theme } from "../campaign-workflow"
+import type { Theme } from "@/types"
 import { selectTheme } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
 import { RefreshCw, Loader2 } from "lucide-react"
@@ -67,7 +67,7 @@ export default function SelectTheme({ themes, onSelect, onBack }: SelectThemePro
     setIsSelecting(true)
 
     try {
-      const result = await selectTheme(theme.campaignId, theme.id)
+      const result = await selectTheme(theme.id)
 
       if (result.success) {
         toast({

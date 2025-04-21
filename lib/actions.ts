@@ -6,8 +6,8 @@ import { revalidatePath } from "next/cache"
 import * as actions_api from "./actions_api"
 
 // Types
-import type { Campaign as CampaignType } from "../components/campaign-workflow"
-import type { Post as PostType } from "../components/campaign-workflow"
+import type { Campaign as CampaignType } from "@/types"
+import type { Post as PostType } from "@/types"
 import type { NewCampaign, NewContentPost } from "./schema"
 
 // Define step constants for clarity

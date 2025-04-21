@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import type { Campaign, Theme, Post } from "../campaign-workflow"
+import type { Campaign, Theme, Post } from "@/types"
 import { CheckCircle, Share2, Calendar, ListOrdered } from "lucide-react"
 import { schedulePosts } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"

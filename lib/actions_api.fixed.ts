@@ -4,8 +4,8 @@ import { db } from "./db"
 import { themes, contentPosts } from "./schema"
 import { eq } from "drizzle-orm"
 import { updateCampaignStep, getCampaignSteps } from "./actions"
-import type { Theme as ThemeType } from "../components/campaign-workflow"
-import type { Campaign as CampaignType } from "../components/campaign-workflow"
+import type { Theme as ThemeType } from "@/types"
+import type { Campaign as CampaignType } from "@/types"
 import type { NewTheme } from "./schema"
 
 // Theme ideas for different types of campaigns - kept for mock generation

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { ImageData, ImagesData } from "@/types"
 
@@ -23,7 +23,7 @@ export function MultipleImagesDisplay({
   const [images, setImages] = useState<ImageData[]>([])
 
   // Parse images JSON when component mounts or imagesJson changes
-  useState(() => {
+  useEffect(() => {
     if (imagesJson) {
       try {
         const parsedData: ImagesData = JSON.parse(imagesJson)

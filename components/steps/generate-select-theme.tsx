@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import type { Campaign, Theme } from "../campaign-workflow"
+import type { Campaign, Theme } from "@/types"
 import { Loader2, RefreshCw } from "lucide-react"
 import { generateThemes, selectTheme } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
@@ -220,6 +220,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
                   <div className="mt-1">
                     <input
                       type="radio"
+                      title={`Select ${theme.title || theme.name} theme`}
                       checked={selectedThemeId === theme.id}
                       onChange={() => handleThemeSelection(theme.id)}
                       className="w-4 h-4"
@@ -231,7 +232,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
 
                     {theme.tags && (
                       <div className="flex flex-wrap gap-2">
-                        {theme.tags.map((tag, index) => (
+                        {theme.tags.map((tag: string, index: number) => (
                           <span
                             key={index}
                             className="py-1 px-3 bg-blue-100 border-2 border-blue-300 rounded-md text-sm"

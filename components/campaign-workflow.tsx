@@ -204,7 +204,7 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
 
   return (
     <div
-      className={`sm:bg-white sm:border-4 sm:border-black sm:rounded-lg sm:p-6 sm:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-2`}
+      className="w-full max-w-full overflow-x-hidden mx-auto bg-white p-3 sm:p-4 md:p-6 border-2 sm:border-4 border-black rounded-md sm:rounded-lg sm:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] md:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
     >
       <WorkflowProgress steps={steps} currentStep={currentStep} isWorkflowComplete={isWorkflowComplete} />
 
@@ -214,7 +214,7 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
         transition={{ duration: 0.3 }}
-        className="mt-8"
+        className="mt-4 sm:mt-6 md:mt-8"
       >
         {currentStep === 0 && <CreateCampaign onSubmit={handleCreateCampaign} initialData={initialCampaign} />}
 
@@ -264,16 +264,16 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
 
         {/* Show loading or error state if data is missing for the current step */}
         {currentStep === 2 && (!campaign || !selectedTheme) && (
-          <div className="text-center p-8">
-            <p className="text-lg font-bold text-red-600">Missing data for content step</p>
-            <p className="text-gray-600 mt-2">
+          <div className="text-center p-3 sm:p-5 md:p-8 rounded-lg border-2 border-red-200 bg-red-50">
+            <p className="text-base sm:text-lg font-bold text-red-600">Missing data for content step</p>
+            <p className="text-sm sm:text-base text-gray-600 mt-2">
               {!campaign && "Campaign data is missing. "}
               {!selectedTheme && "No theme has been selected. "}
               Please go back to the previous steps and complete them.
             </p>
             <button
               onClick={prevStep}
-              className="mt-4 py-2 px-4 bg-yellow-300 border-2 border-black rounded-md font-medium"
+              className="mt-4 py-2 px-4 text-sm sm:text-base bg-yellow-300 border-2 border-black rounded-md font-medium hover:bg-yellow-400 min-h-[44px] min-w-[120px]"
             >
               Go Back
             </button>
@@ -281,14 +281,14 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
         )}
 
         {currentStep === 5 && (!postsWithImages || postsWithImages.length === 0) && (
-          <div className="text-center p-8">
-            <p className="text-lg font-bold text-red-600">Missing data for review step</p>
-            <p className="text-gray-600 mt-2">
+          <div className="text-center p-3 sm:p-5 md:p-8 rounded-lg border-2 border-red-200 bg-red-50">
+            <p className="text-base sm:text-lg font-bold text-red-600">Missing data for review step</p>
+            <p className="text-sm sm:text-base text-gray-600 mt-2">
               No posts with images are available. Please go back to the previous steps and generate images first.
             </p>
             <button
               onClick={prevStep}
-              className="mt-4 py-2 px-4 bg-yellow-300 border-2 border-black rounded-md font-medium"
+              className="mt-4 py-2 px-4 text-sm sm:text-base bg-yellow-300 border-2 border-black rounded-md font-medium hover:bg-yellow-400 min-h-[44px] min-w-[120px]"
             >
               Go Back
             </button>
@@ -296,9 +296,9 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
         )}
 
         {currentStep === 6 && (!campaign || !selectedTheme || reviewedPosts.length === 0) && (
-          <div className="text-center p-8">
-            <p className="text-lg font-bold text-red-600">Missing data for scheduling step</p>
-            <p className="text-gray-600 mt-2">
+          <div className="text-center p-3 sm:p-5 md:p-8 rounded-lg border-2 border-red-200 bg-red-50">
+            <p className="text-base sm:text-lg font-bold text-red-600">Missing data for scheduling step</p>
+            <p className="text-sm sm:text-base text-gray-600 mt-2">
               {!campaign && "Campaign data is missing. "}
               {!selectedTheme && "No theme has been selected. "}
               {reviewedPosts.length === 0 && "No reviewed posts are available. "}
@@ -306,7 +306,7 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
             </p>
             <button
               onClick={() => setCurrentStep(5)} // Go back to Review step
-              className="mt-4 py-2 px-4 bg-yellow-300 border-2 border-black rounded-md font-medium"
+              className="mt-4 py-2 px-4 text-sm sm:text-base bg-yellow-300 border-2 border-black rounded-md font-medium hover:bg-yellow-400 min-h-[44px] min-w-[120px]"
             >
               Go Back to Review
             </button>

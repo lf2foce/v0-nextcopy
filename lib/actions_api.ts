@@ -3,8 +3,8 @@ import { db } from "./db"
 import { themes, contentPosts } from "./schema"
 import { eq } from "drizzle-orm"
 import { updateCampaignStep, getCampaignSteps } from "./actions"
-import type { Theme as ThemeType } from "../components/campaign-workflow"
-import type { Campaign as CampaignType } from "../components/campaign-workflow"
+import type { Theme as ThemeType } from "@/types"
+import type { Campaign as CampaignType } from "@/types"
 import type { NewTheme } from "./schema"
 
 // Theme ideas for different types of campaigns - kept for mock generation
@@ -322,91 +322,144 @@ export async function generateImagesForPost(postId: number, numImages = 1, image
     
     console.log(`Making API request to: ${apiUrl.toString()}`);
     
-    const response = await fetch(apiUrl.toString(), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      // Prevent caching issues
-      cache: "no-store",
-    })
-
-    // Handle non-JSON responses better
-    if (!response.ok) {
-      let errorMessage = `Failed to generate images: ${response.status} ${response.statusText}`
-
-      try {
-        const errorData = await response.json()
-        errorMessage = errorData.error || errorMessage
-      } catch (jsonError) {
-        // If JSON parsing fails, try to get the response as text
+    // Create a fetch request with a timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
+    try {
+      const response = await fetch(apiUrl.toString(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        signal: controller.signal,
+        cache: "no-store"
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // Clone the response for multiple reads
+      const responseClone = response.clone();
+      
+      // Handle non-JSON responses better
+      if (!response.ok) {
+        let errorMessage = `Failed to generate images: ${response.status} ${response.statusText}`;
+        let responseText = "";
+        
         try {
-          const errorText = await response.text()
-          if (errorText) {
-            errorMessage = `${errorMessage} - ${errorText.substring(0, 100)}`
+          responseText = await response.text();
+          console.log("Error response text:", responseText.substring(0, 500));
+          
+          try {
+            // Try parsing as JSON if possible
+            const errorData = JSON.parse(responseText);
+            errorMessage = errorData.error || errorData.detail || errorData.message || errorMessage;
+          } catch (jsonError) {
+            // Not valid JSON, use the text response
+            if (responseText) {
+              errorMessage = `${errorMessage} - ${responseText.substring(0, 100)}`;
+            }
           }
         } catch (textError) {
-          // If even text extraction fails, use the default error message
+          console.error("Failed to read error response as text:", textError);
         }
-      }
-
-      console.error("Error generating images:", errorMessage)
-      return {
-        success: false,
-        error: errorMessage,
-      }
-    }
-
-    // Parse the successful response
-    try {
-      const result = await response.json()
-      console.log("API response for image generation:", result)
-
-      // Check if this is a processing response (async generation started)
-      if (result.data?.status === "processing") {
+        
+        console.error("Error generating images:", errorMessage);
         return {
-          success: true,
-          data: {
-            status: "processing",
-            message: result.data.message || "Image generation started in background",
-          },
-        }
+          success: false,
+          error: errorMessage,
+        };
       }
-
-      // If we have immediate results (unlikely but possible)
-      if (result.data?.images && Array.isArray(result.data.images) && result.data.images.length > 0) {
-        // Update the post with the new images
-        try {
-          const { updatePostImages } = await import("./actions")
-          const imageData = result.data.images
-
-          const formattedData = {
-            images: imageData.map((img: any, idx: number) => ({
-              ...img,
-              isSelected: true,
-              order: idx,
-            })),
-          }
-
-          await updatePostImages([
-            {
-              id: postId,
-              image: imageData[0]?.url || "",
-              imagesJson: JSON.stringify(formattedData),
+      
+      // Try to get response as text first
+      let responseText;
+      try {
+        responseText = await responseClone.text();
+        
+        // Check if the response is empty or not valid JSON
+        if (!responseText.trim()) {
+          return {
+            success: false,
+            error: "Empty response from server"
+          };
+        }
+        
+        console.log("Response text preview:", 
+          responseText.length > 200 ? responseText.substring(0, 200) + "..." : responseText);
+        
+        // Check if the text contains indication of background processing
+        if (responseText.includes("background") || responseText.includes("processing")) {
+          return {
+            success: true,
+            data: {
+              status: "processing",
+              message: "Image generation started in background",
             },
-          ])
-        } catch (dbError) {
-          console.error("Error updating post with new images:", dbError)
+          };
         }
+        
+        // Try to parse the response text as JSON
+        const result = JSON.parse(responseText);
+        console.log("API response for image generation:", result);
+        
+        // Check if this is a processing response (async generation started)
+        if (result.data?.status === "processing") {
+          return {
+            success: true,
+            data: {
+              status: "processing",
+              message: result.data.message || "Image generation started in background",
+            },
+          };
+        }
+        
+        // If we have immediate results (unlikely but possible)
+        if (result.data?.images && Array.isArray(result.data.images) && result.data.images.length > 0) {
+          // Update the post with the new images
+          try {
+            const { updatePostImages } = await import("./actions");
+            const imageData = result.data.images;
+            
+            const formattedData = {
+              images: imageData.map((img: any, idx: number) => ({
+                ...img,
+                isSelected: true,
+                order: idx,
+              })),
+            };
+            
+            await updatePostImages([
+              {
+                id: postId,
+                image: imageData[0]?.url || "",
+                imagesJson: JSON.stringify(formattedData),
+              },
+            ]);
+          } catch (dbError) {
+            console.error("Error updating post with new images:", dbError);
+          }
+        }
+        
+        return { success: true, data: result.data };
+      } catch (parseError) {
+        console.error("Error parsing response:", parseError);
+        return {
+          success: false,
+          error: `Failed to parse response: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+          responseText: responseText ? responseText.substring(0, 200) : "No text available"
+        };
       }
-
-      return { success: true, data: result.data }
-    } catch (parseError) {
-      console.error("Error parsing JSON response:", parseError)
-      return {
-        success: false,
-        error: `Failed to parse response: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.error("Request timed out");
+        return {
+          success: false,
+          error: "Request timed out after 30 seconds"
+        };
       }
+      throw fetchError; // Re-throw for outer catch block
     }
   } catch (error) {
     console.error("Failed to generate images for post:", error)

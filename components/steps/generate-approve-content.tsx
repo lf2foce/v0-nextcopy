@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import type { Campaign, Theme, Post } from "../campaign-workflow"
+import type { Campaign, Theme, Post } from "@/types"
 import { CheckIcon, RefreshCw, Eye, Loader2 } from "lucide-react"
 import PostModal from "../ui/post-modal"
 import {
@@ -97,10 +97,10 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
 
           if (result.success) {
             // If posts are ready, update the posts state
-            if (result.data.isReady) {
+            if (result.data?.isReady) {
               // If we have posts from the status check, use them
-              if (result.data.posts && result.data.posts.length > 0) {
-                setPosts(result.data.posts)
+              if (result.data?.posts && result.data.posts.length > 0) {
+                setPosts(result.data.posts as Post[])
                 setIsPolling(false)
                 setPollingThemeId(null)
 
@@ -506,8 +506,8 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
                   <div className="flex flex-wrap gap-2 mb-4">
                     {post.content
                       .split(" ")
-                      .filter((word) => word.startsWith("#"))
-                      .map((hashtag, index) => (
+                      .filter((word: string) => word.startsWith("#"))
+                      .map((hashtag: string, index: number) => (
                         <span key={index} className="py-1 px-3 bg-blue-100 border-2 border-blue-300 rounded-md text-sm">
                           {hashtag}
                         </span>
