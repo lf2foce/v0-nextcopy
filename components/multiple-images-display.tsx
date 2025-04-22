@@ -1,194 +1,113 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
+import { ImageData, ImagesData } from "@/types"
 
-interface ImageData {
-  url: string
-  prompt: string
-  order: number
-  isDefault?: boolean
-  isSelected?: boolean
-  metadata?: {
-    width: number
-    height: number
-    style: string
-  }
-}
-
-interface ImagesJson {
-  images: ImageData[]
-}
-
-// Update the props interface
 interface MultipleImagesDisplayProps {
-  imagesJson: string | null
+  imagesJson?: string
   defaultImageIndex?: number
-  onSelectDefault?: (index: number) => void
-  className?: string
-  layout?: "grid" | "horizontal"
+  layout?: "horizontal" | "vertical" | "grid"
   showMainImage?: boolean
   videoUrl?: string
-  onImageClick?: (index: number) => void
 }
 
-// Update the function parameters to include the new prop
 export function MultipleImagesDisplay({
   imagesJson,
   defaultImageIndex = 0,
-  onSelectDefault,
-  className = "",
-  layout = "grid",
+  layout = "horizontal",
   showMainImage = true,
-  videoUrl,
-  onImageClick,
+  videoUrl
 }: MultipleImagesDisplayProps) {
-  const [selectedIndex, setSelectedIndex] = useState(defaultImageIndex)
+  const [currentImageIndex, setCurrentImageIndex] = useState(defaultImageIndex)
+  const [images, setImages] = useState<ImageData[]>([])
 
-  // Update the parsing logic to be more robust
-  // Parse the JSON string
-  let imagesData: ImagesJson | null = null
-  try {
+  // Parse images JSON when component mounts or imagesJson changes
+  useEffect(() => {
     if (imagesJson) {
-      imagesData = JSON.parse(imagesJson) as ImagesJson
-
-      // Ensure the images array exists
-      if (!imagesData.images) {
-        imagesData.images = []
+      try {
+        const parsedData: ImagesData = JSON.parse(imagesJson)
+        setImages(parsedData.images || [])
+      } catch (error) {
+        console.error("Error parsing images JSON:", error)
+        setImages([])
       }
     }
-  } catch (error) {
-    console.error("Error parsing images JSON:", error)
-    imagesData = { images: [] }
+  }, [imagesJson])
+
+  if (!images.length && !videoUrl) {
+    return (
+      <div className="w-full h-64 bg-gray-100 border-4 border-black rounded-md flex items-center justify-center">
+        <p className="text-gray-500">No images available</p>
+      </div>
+    )
   }
 
-  // Filter to only show selected images if available
-  const allImages = imagesData?.images || []
-  const selectedImages = allImages.filter((img) => img.isSelected === true)
-
-  // Use selected images if available, otherwise fall back to all images
-  const imagesToDisplay = selectedImages.length > 0 ? selectedImages : allImages
-
-  // If no images data or no images to display, show placeholder or video
-  if (!imagesToDisplay.length) {
+  const renderMainImage = () => {
     if (videoUrl) {
       return (
-        <div className={`${className}`}>
-          <div className="relative aspect-video w-full overflow-hidden rounded-lg border-4 border-black">
-            <video src={videoUrl} controls className="w-full h-full object-cover" poster="/abstract-thumbnail.png" />
-          </div>
+        <div className="relative w-full h-64 border-4 border-black rounded-md overflow-hidden">
+          <video
+            src={videoUrl}
+            controls
+            className="w-full h-full object-cover"
+          />
         </div>
       )
     }
 
-    return (
-      <div className={`flex items-center justify-center p-4 bg-gray-100 rounded-lg border-4 border-black ${className}`}>
-        <p className="text-gray-500">No media available</p>
-      </div>
-    )
-  }
-
-  const handleSelectImage = (index: number) => {
-    setSelectedIndex(index)
-    if (onSelectDefault) {
-      onSelectDefault(index)
-    }
-  }
-
-  // Get the currently selected image
-  const selectedImage = imagesToDisplay[selectedIndex] || imagesToDisplay[0]
-
-  // Horizontal layout (no main image, just thumbnails in a row)
-  if (layout === "horizontal") {
-    return (
-      <div className={`${className}`}>
-        {videoUrl && (
-          <div className="relative aspect-video w-full mb-4 overflow-hidden rounded-lg border-4 border-black">
-            <video src={videoUrl} controls className="w-full h-full object-cover" poster="/abstract-thumbnail.png" />
-          </div>
-        )}
-
-        {imagesToDisplay.length > 0 && (
-          <div className="flex overflow-x-auto gap-3 pb-2 snap-x">
-            {imagesToDisplay.map((image, index) => (
-              <div
-                key={index}
-                className="relative flex-shrink-0 snap-center cursor-pointer"
-                style={{ width: "220px", height: "140px" }}
-                onClick={() => onImageClick && onImageClick(index)}
-              >
-                <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 text-xs rounded z-10">
-                  Style: {image.metadata?.style || "default"}
-                </div>
-                <Image
-                  src={image.url || "/placeholder.svg"}
-                  alt={`Image ${index + 1}`}
-                  fill
-                  className="object-cover rounded-lg border-2 border-black"
-                />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // Default grid layout with main image
-  return (
-    <div className={`space-y-4 ${className}`}>
-      {/* Video if available */}
-      {videoUrl && (
-        <div className="relative aspect-video w-full overflow-hidden rounded-lg border-4 border-black">
-          <video src={videoUrl} controls className="w-full h-full object-cover" poster="/abstract-thumbnail.png" />
-        </div>
-      )}
-
-      {/* Main image display */}
-      {showMainImage && imagesToDisplay.length > 0 && (
-        <div
-          className="relative aspect-video w-full overflow-hidden rounded-lg bg-gray-100 border-4 border-black cursor-pointer"
-          onClick={() => onImageClick && onImageClick(selectedIndex)}
-        >
+    if (images.length > 0) {
+      const currentImage = images[currentImageIndex]
+      return (
+        <div className="relative w-full h-64 border-4 border-black rounded-md overflow-hidden">
           <Image
-            src={selectedImage.url || "/placeholder.svg"}
-            alt={selectedImage.prompt || "Post image"}
+            src={currentImage.url}
+            alt={`Image ${currentImageIndex + 1}`}
             fill
             className="object-cover"
           />
-          <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 text-xs rounded">
-            Style: {selectedImage.metadata?.style || "default"}
-          </div>
+          {currentImage.metadata?.style && (
+            <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+              Style: {currentImage.metadata.style}
+            </div>
+          )}
         </div>
-      )}
+      )
+    }
 
-      {/* Thumbnails */}
-      {imagesToDisplay.length > 1 && (
-        <div className="grid grid-cols-4 gap-2">
-          {imagesToDisplay.map((image, index) => (
-            <button
-              key={index}
-              onClick={(e) => {
-                handleSelectImage(index)
-                if (onImageClick) {
-                  e.stopPropagation()
-                  onImageClick(index)
-                }
-              }}
-              className={`relative aspect-square overflow-hidden rounded-md ${
-                index === selectedIndex ? "ring-2 ring-primary ring-offset-2" : "opacity-70"
-              }`}
-            >
-              <Image
-                src={image.url || "/placeholder.svg"}
-                alt={`Thumbnail ${index + 1}`}
-                fill
-                className="object-cover"
-              />
-            </button>
-          ))}
-        </div>
-      )}
+    return null
+  }
+
+  const renderThumbnails = () => {
+    if (!images.length || layout === "vertical") return null
+
+    return (
+      <div className={`flex gap-2 mt-2 ${layout === "grid" ? "flex-wrap" : "overflow-x-auto"}`}>
+        {images.map((image, index) => (
+          <button
+            key={index}
+            onClick={() => setCurrentImageIndex(index)}
+            className={`relative w-20 h-20 flex-shrink-0 border-2 ${
+              index === currentImageIndex ? "border-blue-500" : "border-black"
+            } rounded-md overflow-hidden`}
+            title={`View image ${index + 1}`}
+          >
+            <Image
+              src={image.url}
+              alt={`Thumbnail ${index + 1}`}
+              fill
+              className="object-cover"
+            />
+          </button>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {showMainImage && renderMainImage()}
+      {renderThumbnails()}
     </div>
   )
 }

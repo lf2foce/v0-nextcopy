@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import type { Campaign, Theme, Post } from "../campaign-workflow"
+import type { Campaign, Theme, Post } from "@/types"
 import { Loader2 } from "lucide-react"
 import { generatePosts } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
@@ -56,7 +56,7 @@ const generateThemeBasedPosts = (campaign: Campaign, theme: Theme): Post[] => {
     id: `post-${Date.now()}-${index}`,
     content,
     image: "/placeholder.svg?height=400&width=400",
-    themeId: theme.id,
+    themeId: typeof theme.id === 'string' ? parseInt(theme.id as string, 10) : theme.id,
     campaignId: campaign.id,
   }))
 }
@@ -89,7 +89,7 @@ export default function GeneratePost({ campaign, theme, onGenerate, onBack }: Ge
           title: "Posts generated",
           description: "Your posts have been generated successfully.",
         })
-        onGenerate(result.data)
+        onGenerate(result.data as Post[] || [])
       } else {
         toast({
           title: "Error",

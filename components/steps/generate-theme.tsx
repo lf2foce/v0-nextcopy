@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import type { Campaign, Theme } from "../campaign-workflow"
+import type { Campaign, Theme } from "@/types"
 import { Loader2, RefreshCw } from "lucide-react"
 import { generateThemes } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
@@ -184,7 +184,7 @@ export default function GenerateTheme({ campaign, onGenerate, onBack }: Generate
           )}
           <p>
             <span className="font-bold">Generation Mode:</span>{" "}
-            {campaign.generationMode === "pre-batch" ? "Pre-batch" : "Just-in-time"}
+            {(campaign as any).generationMode === "pre-batch" ? "Pre-batch" : "Just-in-time"}
           </p>
           <p>
             <span className="font-bold">Repeat Every:</span> {campaign.repeatEveryDays} days

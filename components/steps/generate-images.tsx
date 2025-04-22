@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Image from "next/image"
-import type { Post } from "../campaign-workflow"
+import type { Post } from "@/types"
 import { RefreshCw, Loader2, ArrowRight, ImageIcon } from "lucide-react"
 import { updatePostImages } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"

@@ -2,24 +2,12 @@
 
 import { useState, useRef, useEffect } from "react"
 import Image from "next/image"
-import type { Post } from "../campaign-workflow"
+import { Post, ReviewPostsProps, ImageData, ImagesData, VideoModalProps } from "@/types"
 import { CheckCircle, RefreshCw, Edit, Save, Loader2, X, Eye, Play, Check } from "lucide-react"
 import { updatePostContent, updatePostImages, updatePostVideos, completeReview } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
 // First, import the new ImageViewerModal component
 import ImageViewerModal from "../ui/image-viewer-modal"
-
-interface ReviewPostsProps {
-  posts: Post[]
-  onComplete: (posts: Post[]) => void
-  onBack: () => void
-}
-
-interface VideoModalProps {
-  videoUrl: string
-  isOpen: boolean
-  onClose: () => void
-}
 
 function VideoModal({ videoUrl, isOpen, onClose }: VideoModalProps) {
   const modalRef = useRef<HTMLDivElement>(null)
@@ -95,12 +83,12 @@ function VideoModal({ videoUrl, isOpen, onClose }: VideoModalProps) {
 }
 
 // Helper function to get selected images from a post
-const getSelectedImages = (post: Post) => {
-  if (!post.images) return []
+const getSelectedImages = (post: Post): ImageData[] => {
+  if (!post.images && !post.imagesJson) return []
 
   try {
-    const imagesData = JSON.parse(post.images)
-    return (imagesData.images || []).filter((img: any) => img.isSelected === true)
+    const imagesData: ImagesData = JSON.parse(post.images || post.imagesJson || '{}')
+    return (imagesData.images || []).filter((img: ImageData) => img.isSelected === true)
   } catch (e) {
     console.error("Error parsing images JSON:", e)
     return []
@@ -542,7 +530,7 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
                       let postImages = []
 
                       try {
-                        const imagesData = JSON.parse(post.images)
+                        const imagesData = JSON.parse(post.images || post.imagesJson || '{}')
                         postImages = imagesData.images || []
                       } catch (e) {
                         // If JSON parsing fails, fallback to single image if it exists
@@ -555,7 +543,7 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
 
                       const toggleImageSelection = async (postId: string | number, imageIndex: number) => {
                         try {
-                          const imagesData = JSON.parse(post.images)
+                          const imagesData = JSON.parse(post.images || post.imagesJson || '{}')
                           const updatedImages = [...imagesData.images]
 
                           // Toggle the isSelected property of the clicked image

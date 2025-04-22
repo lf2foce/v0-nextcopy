@@ -12,49 +12,8 @@ import WorkflowProgress from "./workflow-progress"
 import { useToast } from "@/hooks/use-toast"
 import { updateCampaignStep } from "@/lib/actions"
 import { getCampaignSteps } from "@/lib/campaign-steps"
-// First, add the import for the new component
 import GenerateMultipleImages from "./steps/generate-multiple-images"
-
-// Update the Campaign type to match the new schema
-export type Campaign = {
-  id?: number
-  name: string
-  description: string
-  target: string
-  insight?: string
-  repeatEveryDays: number
-  startDate: Date
-  currentStep?: number
-  title?: string
-  targetCustomer?: string
-}
-
-export type Theme = {
-  id: string | number
-  name?: string
-  description?: string
-  campaignId?: number
-  isSelected?: boolean
-  title?: string
-  story?: string
-  tags?: string[]
-}
-
-export type Post = {
-  id: string | number
-  content: string
-  image?: string
-  imageUrl?: string
-  videoUrl?: string
-  imageGenerated?: boolean
-  videoGenerated?: boolean
-  campaignId?: number
-  themeId?: number
-  isApproved?: boolean
-  isScheduled?: boolean
-  title?: string
-  status?: string
-}
+import { Campaign, Theme, Post, CampaignWorkflowProps } from "@/types"
 
 // Updated steps - added Video step between Images and Review
 const steps = ["New campaign", "Themes", "Content", "Images", "Video", "Review", "Schedule"]
@@ -69,20 +28,6 @@ const uiToDatabaseStepMap = {
   5: 6, // Review -> 6 (Review)
   6: 7, // Schedule -> 7 (Completion)
   // Step 8 is reserved for fully scheduled campaigns
-}
-
-interface CampaignWorkflowProps {
-  initialCampaign?: Campaign
-  initialStep?: number
-  initialData?: {
-    campaign?: Campaign
-    themes?: Theme[]
-    selectedTheme?: Theme
-    posts?: Post[]
-    selectedPosts?: Post[]
-    postsWithImages?: Post[]
-    postsWithVideos?: Post[]
-  }
 }
 
 export default function CampaignWorkflow({ initialCampaign, initialStep = 0, initialData }: CampaignWorkflowProps) {
@@ -180,8 +125,24 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
 
   const handleThemeSelected = (theme: Theme) => {
     console.log("Theme selected:", theme)
-    setSelectedTheme(theme)
-    nextStep()
+    
+    // Ensure we have a valid theme object with all required properties
+    const enhancedTheme: Theme = {
+      ...theme,
+      id: theme.id,
+      isSelected: true,
+      title: theme.title || theme.name || "Selected Theme",
+      name: theme.name || theme.title || "Selected Theme"
+    }
+    
+    // Set the selected theme with enhanced properties
+    setSelectedTheme(enhancedTheme)
+    
+    // Force the step change with a small delay to ensure state updates properly
+    setTimeout(() => {
+      console.log("Moving to content step with theme:", enhancedTheme)
+      nextStep()
+    }, 100)
   }
 
   const handleApproveContent = (approvedPosts: Post[]) => {
@@ -243,7 +204,7 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
 
   return (
     <div
-      className={`sm:bg-white sm:border-4 sm:border-black sm:rounded-lg sm:p-6 sm:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-2`}
+      className="w-full max-w-full overflow-x-hidden mx-auto bg-white p-3 sm:p-4 md:p-6 border-2 sm:border-4 border-black rounded-md sm:rounded-lg sm:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] md:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]"
     >
       <WorkflowProgress steps={steps} currentStep={currentStep} isWorkflowComplete={isWorkflowComplete} />
 
@@ -253,7 +214,7 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
         transition={{ duration: 0.3 }}
-        className="mt-8"
+        className="mt-4 sm:mt-6 md:mt-8"
       >
         {currentStep === 0 && <CreateCampaign onSubmit={handleCreateCampaign} initialData={initialCampaign} />}
 
@@ -303,16 +264,16 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
 
         {/* Show loading or error state if data is missing for the current step */}
         {currentStep === 2 && (!campaign || !selectedTheme) && (
-          <div className="text-center p-8">
-            <p className="text-lg font-bold text-red-600">Missing data for content step</p>
-            <p className="text-gray-600 mt-2">
+          <div className="text-center p-3 sm:p-5 md:p-8 rounded-lg border-2 border-red-200 bg-red-50">
+            <p className="text-base sm:text-lg font-bold text-red-600">Missing data for content step</p>
+            <p className="text-sm sm:text-base text-gray-600 mt-2">
               {!campaign && "Campaign data is missing. "}
               {!selectedTheme && "No theme has been selected. "}
               Please go back to the previous steps and complete them.
             </p>
             <button
               onClick={prevStep}
-              className="mt-4 py-2 px-4 bg-yellow-300 border-2 border-black rounded-md font-medium"
+              className="mt-4 py-2 px-4 text-sm sm:text-base bg-yellow-300 border-2 border-black rounded-md font-medium hover:bg-yellow-400 min-h-[44px] min-w-[120px]"
             >
               Go Back
             </button>
@@ -320,14 +281,14 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
         )}
 
         {currentStep === 5 && (!postsWithImages || postsWithImages.length === 0) && (
-          <div className="text-center p-8">
-            <p className="text-lg font-bold text-red-600">Missing data for review step</p>
-            <p className="text-gray-600 mt-2">
+          <div className="text-center p-3 sm:p-5 md:p-8 rounded-lg border-2 border-red-200 bg-red-50">
+            <p className="text-base sm:text-lg font-bold text-red-600">Missing data for review step</p>
+            <p className="text-sm sm:text-base text-gray-600 mt-2">
               No posts with images are available. Please go back to the previous steps and generate images first.
             </p>
             <button
               onClick={prevStep}
-              className="mt-4 py-2 px-4 bg-yellow-300 border-2 border-black rounded-md font-medium"
+              className="mt-4 py-2 px-4 text-sm sm:text-base bg-yellow-300 border-2 border-black rounded-md font-medium hover:bg-yellow-400 min-h-[44px] min-w-[120px]"
             >
               Go Back
             </button>
@@ -335,9 +296,9 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
         )}
 
         {currentStep === 6 && (!campaign || !selectedTheme || reviewedPosts.length === 0) && (
-          <div className="text-center p-8">
-            <p className="text-lg font-bold text-red-600">Missing data for scheduling step</p>
-            <p className="text-gray-600 mt-2">
+          <div className="text-center p-3 sm:p-5 md:p-8 rounded-lg border-2 border-red-200 bg-red-50">
+            <p className="text-base sm:text-lg font-bold text-red-600">Missing data for scheduling step</p>
+            <p className="text-sm sm:text-base text-gray-600 mt-2">
               {!campaign && "Campaign data is missing. "}
               {!selectedTheme && "No theme has been selected. "}
               {reviewedPosts.length === 0 && "No reviewed posts are available. "}
@@ -345,7 +306,7 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
             </p>
             <button
               onClick={() => setCurrentStep(5)} // Go back to Review step
-              className="mt-4 py-2 px-4 bg-yellow-300 border-2 border-black rounded-md font-medium"
+              className="mt-4 py-2 px-4 text-sm sm:text-base bg-yellow-300 border-2 border-black rounded-md font-medium hover:bg-yellow-400 min-h-[44px] min-w-[120px]"
             >
               Go Back to Review
             </button>

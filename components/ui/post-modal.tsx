@@ -2,14 +2,8 @@
 
 import { useEffect, useRef } from "react"
 import { X, Calendar, Instagram, Hash } from "lucide-react"
-import type { Post } from "../campaign-workflow"
+import { Post, PostModalProps } from "@/types"
 import { MultipleImagesDisplay } from "@/components/multiple-images-display"
-
-interface PostModalProps {
-  post: Post
-  isOpen: boolean
-  onClose: () => void
-}
 
 export default function PostModal({ post, isOpen, onClose }: PostModalProps) {
   const modalRef = useRef<HTMLDivElement>(null)
@@ -60,6 +54,7 @@ export default function PostModal({ post, isOpen, onClose }: PostModalProps) {
           <button
             onClick={onClose}
             className="w-10 h-10 flex items-center justify-center bg-white border-2 border-black rounded-md hover:bg-gray-100 transition-colors"
+            title="Close modal"
           >
             <X size={20} />
           </button>
@@ -69,8 +64,8 @@ export default function PostModal({ post, isOpen, onClose }: PostModalProps) {
           {/* Media section - Images and Video */}
           <div className="mb-6">
             <MultipleImagesDisplay
-              imagesJson={post.images}
-              defaultImageIndex={0}
+              imagesJson={post.images || post.imagesJson}
+              defaultImageIndex={post.defaultImageIndex || 0}
               layout="horizontal"
               showMainImage={false}
               videoUrl={post.videoUrl}

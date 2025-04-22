@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { useSearchParams } from "next/navigation"
-import type { Campaign } from "../campaign-workflow"
+import type { Campaign } from "@/types"
 import { createCampaign } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2, AlertCircle } from "lucide-react"
@@ -100,7 +100,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
     setSelectedTemplate(template)
 
     // Update form data with more meaningful customer insight
-    setFormData((prev) => ({
+    setFormData((prev: Campaign) => ({
       ...prev,
       name: template.name + " Campaign",
       description: template.description,
@@ -121,7 +121,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
-    setFormData((prev) => ({
+    setFormData((prev: Campaign) => ({
       ...prev,
       [name]: value,
     }))
@@ -130,7 +130,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     const parsedValue = Number.parseInt(value, 10)
-    setFormData((prev) => ({
+    setFormData((prev: Campaign) => ({
       ...prev,
       [name]: isNaN(parsedValue) ? 0 : parsedValue,
     }))
@@ -138,7 +138,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData((prev) => ({
+    setFormData((prev: Campaign) => ({
       ...prev,
       [name]: new Date(value),
     }))
@@ -313,7 +313,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
             name="startDate"
             type="date"
             required
-            min={today}
+            min={today} // Giá trị min này cho phép chọn ngày hôm nay
             value={formattedStartDate}
             onChange={handleDateChange}
             className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"

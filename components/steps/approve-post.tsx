@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Image from "next/image"
-import type { Post } from "../campaign-workflow"
+import type { Post } from "@/types"
 import { CheckIcon, RefreshCw, Eye, Loader2 } from "lucide-react"
 import PostModal from "../ui/post-modal"
 import { approvePosts, updatePostContent } from "@/lib/actions"

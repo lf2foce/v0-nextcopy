@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
-import type { Post } from "../campaign-workflow"
+import type { Post } from "@/types"
 import { Loader2, RefreshCw, Play, CheckCircle, Eye } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { updatePostVideos } from "@/lib/actions"
+import { MultipleImagesDisplay } from "@/components/multiple-images-display"
+import { Button } from "@/components/ui/button"
 
 // Sample video URLs from Google's public video bucket
 const sampleVideoUrls = [
@@ -95,437 +97,108 @@ function VideoModal({ videoUrl, isOpen, onClose }: VideoModalProps) {
 
 interface GenerateVideoProps {
   posts: Post[]
-  onComplete: (postsWithVideos: Post[]) => void
+  onComplete: (posts: Post[]) => void
   onBack: () => void
 }
 
-export default function GenerateVideo({ posts, onComplete, onBack }: GenerateVideoProps) {
+export default function GenerateVideo({
+  posts,
+  onComplete,
+  onBack
+}: GenerateVideoProps) {
   const [localPosts, setLocalPosts] = useState<Post[]>(posts)
-  const [isGeneratingAll, setIsGeneratingAll] = useState(false)
-  const [generatingPostId, setGeneratingPostId] = useState<string | number | null>(null)
-  const [generationProgress, setGenerationProgress] = useState(0)
-  const [allVideosGenerated, setAllVideosGenerated] = useState(false)
-  const [isFinalizing, setIsFinalizing] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [currentPostIndex, setCurrentPostIndex] = useState(0)
   const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null)
   const { toast } = useToast()
 
-  // Progress interval reference
-  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
-
-  // Check if posts already have videos (for when returning to this step)
-  useEffect(() => {
-    // Initialize localPosts with the provided posts
-    setLocalPosts(posts)
-
-    // Check if ALL posts have valid videos
-    const hasAllVideos = posts.every((post) => {
-      return post.videoUrl && post.videoUrl !== "/placeholder.mp4"
-    })
-
-    setAllVideosGenerated(hasAllVideos)
-  }, [posts])
-
-  // Clean up interval on unmount
-  useEffect(() => {
-    return () => {
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current)
-      }
-    }
-  }, [])
-
-  // Function to generate a real video URL
-  const generateVideoUrl = (postId: string | number) => {
-    // Get a random video from the sample videos
-    const randomIndex = Math.floor(Math.random() * sampleVideoUrls.length)
-    return sampleVideoUrls[randomIndex]
-  }
-
-  // Function to generate videos for all posts
-  const generateAllVideos = async () => {
-    setIsGeneratingAll(true)
-    setGenerationProgress(0)
-
-    const updatedPosts = [...localPosts]
-    const postsToUpdate: { id: number; video: string }[] = []
-
-    // Set up progress interval - increment every 200ms
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current)
-    }
-
-    progressIntervalRef.current = setInterval(() => {
-      setGenerationProgress((prev) => {
-        // Increase by random amount between 1-5%
-        const increment = Math.floor(Math.random() * 5) + 1
-        const newProgress = Math.min(prev + increment, 95)
-        return newProgress
-      })
-    }, 200)
-
-    // Generate videos for all posts
-    for (let i = 0; i < updatedPosts.length; i++) {
-      const newVideoUrl = generateVideoUrl(updatedPosts[i].id)
-      updatedPosts[i] = {
-        ...updatedPosts[i],
-        videoUrl: newVideoUrl,
-        videoGenerated: true,
-      }
-
-      // If the post has a numeric ID, add it to the list to update in the database
-      if (typeof updatedPosts[i].id === "number") {
-        postsToUpdate.push({
-          id: updatedPosts[i].id as number,
-          video: newVideoUrl,
-        })
-      }
-    }
-
-    // Update posts with videos after a short delay to simulate background processing
-    setTimeout(async () => {
-      // Clear the progress interval
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current)
-        progressIntervalRef.current = null
-      }
-
-      // Update the database if we have numeric IDs
-      if (postsToUpdate.length > 0) {
-        try {
-          const result = await updatePostVideos(postsToUpdate)
-          if (!result.success) {
-            toast({
-              title: "Warning",
-              description: "Videos generated but not all saved to database",
-              variant: "destructive",
-            })
-          }
-        } catch (error) {
-          console.error("Error updating post videos:", error)
-          toast({
-            title: "Warning",
-            description: "Videos generated but not saved to database",
-            variant: "destructive",
-          })
-        }
-      }
-
-      setLocalPosts(updatedPosts)
-      setGenerationProgress(100)
-      setAllVideosGenerated(true)
-      setIsGeneratingAll(false)
-
-      toast({
-        title: "Videos generated",
-        description: "All videos have been generated successfully.",
-      })
-    }, 3000)
-  }
-
-  // Function to regenerate a single video
-  const regenerateVideo = async (postId: string | number) => {
-    setGeneratingPostId(postId)
-
+  const handleGenerateVideo = async (postId: string | number) => {
+    setIsGenerating(true)
     try {
-      // Generate a new video URL
-      const newVideoUrl = generateVideoUrl(postId)
+      // Mock video generation - replace with actual API call
+      const mockVideoUrl = "https://example.com/video.mp4"
 
-      // Update the database if we have a numeric ID
-      if (typeof postId === "number") {
-        const result = await updatePostVideos([{ id: postId, video: newVideoUrl }])
-        if (!result.success) {
-          toast({
-            title: "Warning",
-            description: "Video regenerated but not saved to database",
-            variant: "destructive",
-          })
-        }
-      }
-
-      // Update the specific post with a new video
-      setLocalPosts((prevPosts) =>
-        prevPosts.map((post) =>
+      // Update the post with generated video
+      setLocalPosts(prevPosts =>
+        prevPosts.map(post =>
           post.id === postId
             ? {
                 ...post,
-                videoUrl: newVideoUrl,
-                videoGenerated: true,
+                videoUrl: mockVideoUrl,
+                videoGenerated: true
               }
-            : post,
-        ),
+            : post
+        )
       )
 
-      toast({
-        title: "Video regenerated",
-        description: "The video has been regenerated successfully.",
-      })
+      // Move to next post
+      if (currentPostIndex < posts.length - 1) {
+        setCurrentPostIndex(prev => prev + 1)
+      }
     } catch (error) {
-      console.error("Error regenerating video:", error)
-      toast({
-        title: "Error",
-        description: "Failed to regenerate video",
-        variant: "destructive",
-      })
+      console.error("Error generating video:", error)
     } finally {
-      setGeneratingPostId(null)
+      setIsGenerating(false)
     }
   }
 
-  // Function to handle completion
-  const handleComplete = async () => {
-    setIsFinalizing(true)
-
-    try {
-      // Call onComplete with the updated posts
-      onComplete(localPosts)
-    } catch (error) {
-      console.error("Error completing video generation:", error)
-      toast({
-        title: "Error",
-        description: "Failed to complete video generation",
-        variant: "destructive",
-      })
-    } finally {
-      setIsFinalizing(false)
-    }
+  const handleComplete = () => {
+    onComplete(localPosts)
   }
 
-  // Function to preview video
-  const previewVideo = (videoUrl: string) => {
-    setVideoModalUrl(videoUrl)
-  }
-
-  // Helper function to get selected images from a post
-  const getSelectedImages = (post: Post) => {
-    if (!post.images) return []
-
-    try {
-      const imagesData = JSON.parse(post.images)
-      return (imagesData.images || []).filter((img: any) => img.isSelected === true)
-    } catch (e) {
-      console.error("Error parsing images JSON:", e)
-      return []
-    }
-  }
+  const currentPost = localPosts[currentPostIndex]
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-black mb-2">Generate Videos</h2>
-        <p className="text-gray-700">Create videos for your posts based on their content and images</p>
+        <p className="text-gray-700">Generate videos for your posts</p>
       </div>
-
-      {isGeneratingAll && (
-        <div className="bg-gray-100 border-4 border-black rounded-md p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-bold">Generating videos...</span>
-            <span className="font-bold">{generationProgress}%</span>
-          </div>
-          <div className="w-full bg-gray-300 h-4 rounded-md border-2 border-black overflow-hidden">
-            <div
-              className="bg-yellow-300 h-full transition-all duration-300 ease-out"
-              style={{ width: `${generationProgress}%` }}
-            ></div>
-          </div>
-        </div>
-      )}
-
-      {/* Always show the Generate All Videos button when not generating */}
-      {!isGeneratingAll && (
-        <div className="flex justify-center mb-4">
-          <button
-            onClick={generateAllVideos}
-            disabled={isGeneratingAll}
-            className="py-3 px-6 bg-yellow-300 border-4 border-black rounded-md font-bold text-lg hover:bg-yellow-400 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2"
-          >
-            <Play size={20} />
-            {allVideosGenerated ? "Regenerate All Videos" : "Generate All Videos"}
-          </button>
-        </div>
-      )}
 
       <div className="space-y-4">
-        {localPosts.map((post, index) => {
-          const isGenerating = generatingPostId === post.id
-          const hasVideo = post.videoUrl && post.videoUrl !== "/placeholder.mp4"
-          const selectedImages = getSelectedImages(post)
+        <div className="p-4 bg-yellow-100 border-4 border-black rounded-md">
+          <h3 className="font-bold mb-2">Post {currentPostIndex + 1} of {posts.length}</h3>
+          <p className="mb-4">{currentPost.content}</p>
 
-          return (
-            <div key={post.id} className="border-4 border-black rounded-md p-4 bg-white">
-              <div className="flex flex-col gap-4">
-                {/* Add post title/ID in the header */}
-                <div className="p-4 bg-yellow-100 border-b-4 border-black flex justify-between items-center">
-                  <h3 className="font-bold text-lg">Post {index + 1}</h3>
-                  <div className="flex items-center gap-2">
-                    {hasVideo && (
-                      <span className="flex items-center gap-1 text-green-600">
-                        <CheckCircle size={16} />
-                        Generated
-                      </span>
-                    )}
-                  </div>
-                </div>
+          <MultipleImagesDisplay
+            imagesJson={currentPost.images || currentPost.imagesJson}
+            defaultImageIndex={currentPost.defaultImageIndex || 0}
+            layout="grid"
+            videoUrl={currentPost.videoUrl}
+          />
+        </div>
 
-                {/* Post content */}
-                <p className="text-lg mb-2">{post.content}</p>
+        <div className="flex gap-4">
+          <Button
+            onClick={onBack}
+            variant="outline"
+            disabled={isGenerating}
+          >
+            Back
+          </Button>
 
-                {/* Images row - ONLY SELECTED IMAGES */}
-                <div className="mb-4">
-                  <div className="grid grid-cols-4 gap-2">
-                    {post.images ? (
-                      // If post has multiple images (from JSON), display only selected ones
-                      (() => {
-                        try {
-                          const imagesData = JSON.parse(post.images)
-                          const images = (imagesData.images || []).filter((image: any) => image.isSelected === true)
-
-                          // If no selected images or all are placeholders, don't show anything
-                          const realImages = images.filter((img: any) => !img.url.includes("placeholder.svg"))
-
-                          if (realImages.length === 0) {
-                            return (
-                              <div className="col-span-4 py-3 text-center text-gray-500 border-2 border-dashed border-gray-300 rounded-md">
-                                No images selected for this post
-                              </div>
-                            )
-                          }
-
-                          // Show only real images
-                          return realImages.map((image: any, idx: number) => (
-                            <div
-                              key={idx}
-                              className="relative h-24 border-2 border-gray-200 rounded-md overflow-hidden"
-                            >
-                              <Image
-                                src={image.url || "/placeholder.svg"}
-                                alt={`Image ${idx + 1}`}
-                                fill
-                                className="object-cover"
-                              />
-                              <div className="absolute top-1 left-1 bg-black/70 text-white text-xs px-2 py-0.5 rounded">
-                                Style: {image.metadata?.style || "default"}
-                              </div>
-                            </div>
-                          ))
-                        } catch (e) {
-                          // Check if single image is a placeholder
-                          if (post.image?.includes("placeholder.svg") || post.imageUrl?.includes("placeholder.svg")) {
-                            return (
-                              <div className="col-span-4 py-3 text-center text-gray-500 border-2 border-dashed border-gray-300 rounded-md">
-                                No images selected for this post
-                              </div>
-                            )
-                          }
-
-                          // Fallback to single image if JSON parsing fails and it's not a placeholder
-                          if (post.image || post.imageUrl) {
-                            return (
-                              <div className="relative h-24 border-2 border-gray-200 rounded-md overflow-hidden">
-                                <Image
-                                  src={post.image || post.imageUrl || ""}
-                                  alt="Post image"
-                                  fill
-                                  className="object-cover"
-                                />
-                              </div>
-                            )
-                          }
-
-                          return (
-                            <div className="col-span-4 py-3 text-center text-gray-500 border-2 border-dashed border-gray-300 rounded-md">
-                              No images available for this post
-                            </div>
-                          )
-                        }
-                      })()
-                    ) : (
-                      // No images data at all
-                      <div className="col-span-4 py-3 text-center text-gray-500 border-2 border-dashed border-gray-300 rounded-md">
-                        No images available for this post
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Video status */}
-                <div className="bg-gray-100 border-2 border-black rounded-md p-3 mb-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Play size={16} className="text-black" />
-                      <span className="font-medium">Video Status:</span>
-                    </div>
-                    {hasVideo ? (
-                      <span className="flex items-center gap-1 text-green-600">
-                        <CheckCircle size={16} />
-                        Generated
-                      </span>
-                    ) : isGenerating ? (
-                      <span className="flex items-center gap-1">
-                        <Loader2 size={16} className="animate-spin" />
-                        Generating...
-                      </span>
-                    ) : (
-                      <span className="text-gray-500">Not generated</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  {hasVideo && (
-                    <button
-                      onClick={() => previewVideo(post.videoUrl!)}
-                      className="py-1 px-3 bg-blue-300 border-2 border-black rounded-md hover:bg-blue-400 flex items-center gap-1 text-sm"
-                    >
-                      <Eye size={14} />
-                      Preview Video
-                    </button>
-                  )}
-                  <button
-                    onClick={() => regenerateVideo(post.id)}
-                    disabled={isGenerating || isGeneratingAll}
-                    className="py-1 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 flex items-center gap-1 text-sm disabled:opacity-50"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 size={14} className="animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw size={14} />
-                        {hasVideo ? "Regenerate Video" : "Generate Video"}
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      <div className="flex gap-4">
-        <button
-          onClick={onBack}
-          disabled={isGeneratingAll || generatingPostId !== null || isFinalizing}
-          className="py-3 px-6 bg-white border-4 border-black rounded-md font-bold text-lg hover:bg-gray-100 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:opacity-70"
-        >
-          Back
-        </button>
-        <button
-          onClick={handleComplete}
-          disabled={isGeneratingAll || generatingPostId !== null || isFinalizing}
-          className="flex-1 py-3 px-6 bg-green-400 border-4 border-black rounded-md font-bold text-lg hover:bg-green-500 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:opacity-70 disabled:transform-none disabled:hover:bg-green-400 flex items-center justify-center gap-2"
-        >
-          {isFinalizing ? (
-            <span className="flex items-center justify-center">
-              <Loader2 className="animate-spin mr-2" size={20} />
-              Finalizing...
-            </span>
-          ) : (
-            "Continue to Review"
+          {!currentPost.videoUrl && (
+            <Button
+              onClick={() => handleGenerateVideo(currentPost.id)}
+              disabled={isGenerating}
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                "Generate Video"
+              )}
+            </Button>
           )}
-        </button>
+
+          {currentPost.videoUrl && currentPostIndex === posts.length - 1 && (
+            <Button onClick={handleComplete}>
+              Continue
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Video Modal */}

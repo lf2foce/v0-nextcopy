@@ -81,7 +81,7 @@ export async function seedDatabase(forceSeeding = false) {
           startDate: new Date("2025-11-15"),
           isActive: true,
         },
-      ])
+      ] as any)
       .returning()
 
     console.log(`Inserted ${insertedCampaigns.length} sample campaigns`)
@@ -205,7 +205,7 @@ export async function seedDatabase(forceSeeding = false) {
                 images: generateImagesJson(3),
                 defaultImageIndex: 0,
               },
-            ])
+            ] as any)
             .returning()
 
           console.log(`Inserted ${insertedPosts.length} sample content posts`)

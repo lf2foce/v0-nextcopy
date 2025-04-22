@@ -10,6 +10,14 @@ const config: Config = {
     "components/**/*.{ts,tsx}",
   ],
   theme: {
+    screens: {
+      'xs': '480px',
+      'sm': '640px',
+      'md': '768px',
+      'lg': '1024px',
+      'xl': '1280px',
+      '2xl': '1536px',
+    },
     extend: {
       colors: {
         border: "hsl(var(--border))",
@@ -66,6 +74,31 @@ const config: Config = {
           md: "calc(var(--radius) - 2px)",
           sm: "calc(var(--radius) - 4px)",
         },
+      },
+      spacing: {
+        '4.5': '1.125rem', // 18px
+        '13': '3.25rem',   // 52px
+        '15': '3.75rem',   // 60px
+        '128': '32rem',    // 512px
+        '144': '36rem',    // 576px
+      },
+      fontSize: {
+        '2xs': '0.625rem', // 10px
+        'xs': '0.75rem',   // 12px
+        'sm': '0.875rem',  // 14px
+        'base': '1rem',    // 16px
+        'lg': '1.125rem',  // 18px
+        'xl': '1.25rem',   // 20px
+        '2xl': '1.5rem',   // 24px
+        '3xl': '1.875rem', // 30px
+        '4xl': '2.25rem',  // 36px
+      },
+      minHeight: {
+        '6': '1.5rem',     // 24px
+        '8': '2rem',       // 32px
+        '10': '2.5rem',    // 40px
+        '12': '3rem',      // 48px
+        '16': '4rem',      // 64px
       },
     },
   },

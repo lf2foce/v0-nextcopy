@@ -18,7 +18,6 @@ import {
 import { useRouter } from "next/navigation"
 import { getCampaign, toggleCampaignActiveStatus } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
-import { use } from "react"
 
 export default function CampaignDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -27,13 +26,15 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
   const [isPaused, setIsPaused] = useState(false)
   const [isToggling, setIsToggling] = useState(false)
   const { toast } = useToast()
-  const unwrappedParams = use(params)
+  
+  // Get the campaign ID from params
+  const campaignId = Number.parseInt(params.id, 10)
 
   useEffect(() => {
     const loadCampaign = async () => {
       try {
         // Use the actual API function to get campaign data
-        const result = await getCampaign(Number.parseInt(unwrappedParams.id, 10))
+        const result = await getCampaign(campaignId)
         if (result.success && result.data) {
           setCampaign(result.data)
           // Set initial pause state based on campaign data
@@ -49,7 +50,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
     }
 
     loadCampaign()
-  }, [unwrappedParams.id])
+  }, [campaignId])
 
   const togglePauseStatus = async () => {
     if (!campaign || isToggling) return
@@ -268,7 +269,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">Content Preview</h2>
               <Link
-                href={`/campaigns/${unwrappedParams.id}/content`}
+                href={`/campaigns/${campaignId}/content`}
                 className="py-2 px-4 bg-[#60a5fa] border-2 border-black rounded-md font-medium hover:bg-[#3b82f6] text-white"
               >
                 View All Content
@@ -415,14 +416,14 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
               </button>
 
               <Link
-                href={`/themes?campaignId=${unwrappedParams.id}`}
+                href={`/themes?campaignId=${campaignId}`}
                 className="w-full flex items-center justify-center gap-2 py-3 px-6 bg-[#FFDD00] border-4 border-black rounded-md font-bold text-lg hover:bg-[#FFCC00] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
               >
                 View Themes
               </Link>
 
               <Link
-                href={`/campaigns/${unwrappedParams.id}/content`}
+                href={`/campaigns/${campaignId}/content`}
                 className="w-full flex items-center justify-center gap-2 py-3 px-6 bg-[#60a5fa] border-4 border-black rounded-md font-bold text-lg hover:bg-[#3b82f6] text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
               >
                 View Content

@@ -12,7 +12,7 @@ export async function GET() {
       count: allCampaigns.length,
       campaigns: allCampaigns.map((c) => ({
         id: c.id,
-        name: c.name,
+        name: c.title,
         currentStep: c.currentStep,
         status: c.currentStep === 7 ? "scheduled" : "in-progress",
       })),
