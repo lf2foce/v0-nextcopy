@@ -12,12 +12,13 @@ export async function GET(request: NextRequest, { params }: { params: { themeId:
 
     // Call the external API
     try {
-      const response = await fetch(`https://techlocal-copy.onrender.com/themes/${themeId}/status`, {
+      const response = await fetch(`${process.env.FASTAPI_URL}/themes/${themeId}/status`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
+        signal: AbortSignal.timeout(30000), // 30 second timeout
       })
 
       // Log the response status

@@ -148,6 +148,22 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
       }
     } catch (fetchError) {
       console.error("Network error when calling FastAPI:", fetchError)
+      
+      // Special handling for timeout errors
+      const isTimeout = 
+        (fetchError instanceof Error && fetchError.name === 'AbortError') ||
+        (fetchError instanceof Error && fetchError.message?.includes('timeout'));
+        
+      if (isTimeout) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "The backend service is taking too long to respond. This might be due to a cold start. Please try again.",
+          },
+          { status: 503 }
+        );
+      }
+      
       return NextResponse.json(
         {
           success: false,

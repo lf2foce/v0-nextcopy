@@ -102,7 +102,7 @@ export async function generateThemes(campaignId: number, themesData?: ThemeType[
     // Use the external API via our proxy endpoint
     console.log("Fetching themes from external API")
     try {
-      const response = await fetch("https://nextcopy.vercel.app/api/copy/themes/generate", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/copy/themes/generate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -199,7 +199,7 @@ export async function selectTheme(themeId: number) {
     console.log(`Selecting theme ${themeId} via external API`)
 
     // Use the external API via our proxy endpoint
-    const response = await fetch("https://nextcopy.vercel.app/api/copy/themes/select", {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/copy/themes/select`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -309,7 +309,7 @@ export async function generateImagesForPost(postId: number, numImages = 1, image
 
     // Call our API route that will call the FastAPI backend
     const response = await fetch(
-      `https://nextcopy.vercel.app/api/posts/${postId}/generate-images?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/posts/${postId}/generate-images?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}`,
       {
         method: "POST",
         headers: {

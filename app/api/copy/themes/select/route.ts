@@ -12,7 +12,10 @@ export async function POST(request: NextRequest) {
 
     // Call the external API
     try {
-      const response = await fetch(`https://techlocal-copy.onrender.com/themes/${themeId}/select`, {
+      const fastApiUrl = process.env.FASTAPI_URL || "http://nextcopy-backend-test.onrender.com"
+      console.log(`Connecting to FastAPI backend at: ${fastApiUrl}`)
+      
+      const response = await fetch(`${fastApiUrl}/themes/${themeId}/select`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
