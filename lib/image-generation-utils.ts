@@ -13,6 +13,19 @@ export interface PostImage {
   }
 }
 
+// Helper function to check if an image URL is valid
+export function isValidImageUrl(url: string | undefined): boolean {
+  if (!url) return false
+
+  // Check for common image formats or placeholder
+  // Avoid blob URLs as they can cause issues in some environments
+  if (url.startsWith("blob:")) {
+    return false
+  }
+
+  return url.startsWith("http") || url.startsWith("/") || url.startsWith("data:image/")
+}
+
 // Generate placeholder images for a post
 export function generatePlaceholderImages(postId: string | number): PostImage[] {
   return [
@@ -30,13 +43,22 @@ export function generatePlaceholderImages(postId: string | number): PostImage[] 
   ]
 }
 
-// Get images from a post
+// Get images from a post with improved error handling
 export function getPostImages(post: Post): PostImage[] {
   if (!post.images) return []
 
   try {
     const imagesData = JSON.parse(post.images)
-    return imagesData.images?.images || imagesData.images || []
+    const images = imagesData.images?.images || imagesData.images || []
+
+    // Validate and sanitize each image
+    return images.map((img: any) => ({
+      url: isValidImageUrl(img.url) ? img.url : "/placeholder.svg?text=Invalid+Image",
+      prompt: img.prompt || "Image",
+      order: img.order || 0,
+      isSelected: !!img.isSelected,
+      metadata: img.metadata || { style: "default", width: 400, height: "300" },
+    }))
   } catch (e) {
     console.error("Error parsing images JSON:", e)
     return []
@@ -47,7 +69,7 @@ export function getPostImages(post: Post): PostImage[] {
 export function hasRealImages(post: Post): boolean {
   const images = getPostImages(post)
   if (images.length === 0) return false
-  return images.some((img) => !img.url.includes("placeholder.svg"))
+  return images.some((img) => !img.url.includes("placeholder.svg") && isValidImageUrl(img.url))
 }
 
 // Get the count of selected images for a post
@@ -66,14 +88,21 @@ export function formatImagesData(images: PostImage[]): string {
   })
 }
 
-// Get the main image URL from a post
+// Get the main image URL from a post with validation
 export function getMainImageUrl(post: Post): string {
   const images = getPostImages(post)
-  const selectedImages = images.filter((img) => img.isSelected)
+  const selectedImages = images.filter((img) => img.isSelected && isValidImageUrl(img.url))
 
   if (selectedImages.length > 0) {
     return selectedImages[0].url
   }
 
-  return post.imageUrl || (images.length > 0 ? images[0].url : "")
+  // Fallback to imageUrl if it's valid
+  if (post.imageUrl && isValidImageUrl(post.imageUrl)) {
+    return post.imageUrl
+  }
+
+  // Final fallback to first valid image or placeholder
+  const validImage = images.find((img) => isValidImageUrl(img.url))
+  return validImage ? validImage.url : "/placeholder.svg?text=No+Valid+Image"
 }

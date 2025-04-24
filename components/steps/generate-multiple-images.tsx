@@ -11,7 +11,7 @@ import {
   clearPostImages,
 } from "@/lib/actions_api"
 import PostImageCard from "@/components/post-image-card"
-import { generatePlaceholderImages, getSelectedImagesCount } from "@/lib/image-generation-utils"
+import { generatePlaceholderImages, getSelectedImagesCount, isValidImageUrl } from "@/lib/image-generation-utils"
 
 interface GenerateMultipleImagesProps {
   posts: Post[]
@@ -55,11 +55,29 @@ export default function GenerateMultipleImages({
     try {
       const imagesData = JSON.parse(post.images)
       const images = imagesData.images?.images || imagesData.images || []
-      return images.some((img: any) => !img.url.includes("placeholder.svg"))
+      return images.some((img: any) => {
+        // Skip blob URLs and placeholders
+        if (!img.url || img.url.includes("placeholder.svg") || img.url.startsWith("blob:")) {
+          return false
+        }
+        return true
+      })
     } catch (e) {
       console.error("Error parsing images JSON:", e)
       return false
     }
+  }
+
+  // Helper function to sanitize images data
+  const sanitizeImagesData = (imagesData: any) => {
+    if (!imagesData || !imagesData.images) return { images: [] }
+
+    // Filter out blob URLs and invalid images
+    const sanitizedImages = imagesData.images.filter((img: any) => {
+      return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
+    })
+
+    return { images: sanitizedImages }
   }
 
   // Initialize posts with placeholders if needed
@@ -67,7 +85,21 @@ export default function GenerateMultipleImages({
     const initializedPosts = posts.map((post) => {
       // Keep existing images if they're real (not placeholders)
       if (post.images && hasRealImages(post)) {
-        return post
+        try {
+          // Parse and sanitize existing images
+          const imagesData = JSON.parse(post.images)
+          const sanitizedData = sanitizeImagesData(imagesData)
+
+          // Only use sanitized data if it has images
+          if (sanitizedData.images.length > 0) {
+            return {
+              ...post,
+              images: JSON.stringify(sanitizedData),
+            }
+          }
+        } catch (e) {
+          console.error("Error sanitizing images:", e)
+        }
       }
 
       // Otherwise add placeholder images
@@ -143,9 +175,25 @@ export default function GenerateMultipleImages({
   // Update post with new images
   const updatePostWithImages = useCallback(
     (postId: number, images: any[]) => {
+      // Filter out blob URLs and invalid images
+      const validImages = images.filter((img) => {
+        return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
+      })
+
+      // If no valid images, show error
+      if (validImages.length === 0) {
+        setErrorMessages((prev) => ({
+          ...prev,
+          [postId]: "No valid images were generated",
+        }))
+
+        stopPollingForPost(postId)
+        return
+      }
+
       // Format images data
       const formattedData = {
-        images: images.map((img, idx) => ({
+        images: validImages.map((img, idx) => ({
           ...img,
           isSelected: true,
           order: idx,
@@ -159,7 +207,7 @@ export default function GenerateMultipleImages({
             return {
               ...post,
               images: JSON.stringify(formattedData),
-              imageUrl: images[0]?.url || post.imageUrl,
+              imageUrl: validImages[0]?.url || post.imageUrl,
             }
           }
           return post
@@ -202,7 +250,7 @@ export default function GenerateMultipleImages({
       if (typeof postId === "number") {
         setTimeout(async () => {
           try {
-            await saveImageSelection(postId, JSON.stringify(formattedData), images[0]?.url || "")
+            await saveImageSelection(postId, JSON.stringify(formattedData), validImages[0]?.url || "")
           } catch (error) {
             console.error("Error saving images to database:", error)
           }
@@ -215,7 +263,7 @@ export default function GenerateMultipleImages({
       // Force UI refresh immediately
       forceRefresh()
     },
-    [forceRefresh],
+    [forceRefresh, stopPollingForPost],
   )
 
   // Start polling for a post
@@ -260,18 +308,44 @@ export default function GenerateMultipleImages({
 
               // Update post with images if available
               if (result.data.images && result.data.images.length > 0) {
-                updatePostWithImages(postId, result.data.images)
-
-                toast({
-                  title: "Images ready",
-                  description: `Images for post ${postId} have been generated successfully.`,
+                // Filter out blob URLs
+                const validImages = result.data.images.filter((img: any) => {
+                  return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
                 })
+
+                if (validImages.length > 0) {
+                  updatePostWithImages(postId, validImages)
+
+                  toast({
+                    title: "Images ready",
+                    description: `Images for post ${postId} have been generated successfully.`,
+                  })
+                } else {
+                  setErrorMessages((prev) => ({
+                    ...prev,
+                    [postId]: "No valid images were generated",
+                  }))
+                  stopPollingForPost(postId)
+                }
               } else {
                 // Try one more direct fetch
                 try {
                   const directResult = await checkImageGenerationStatus(postId)
                   if (directResult.success && directResult.data.images && directResult.data.images.length > 0) {
-                    updatePostWithImages(postId, directResult.data.images)
+                    // Filter out blob URLs
+                    const validImages = directResult.data.images.filter((img: any) => {
+                      return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
+                    })
+
+                    if (validImages.length > 0) {
+                      updatePostWithImages(postId, validImages)
+                    } else {
+                      setErrorMessages((prev) => ({
+                        ...prev,
+                        [postId]: "No valid images were generated",
+                      }))
+                      stopPollingForPost(postId)
+                    }
                   } else {
                     setErrorMessages((prev) => ({
                       ...prev,
@@ -350,28 +424,56 @@ export default function GenerateMultipleImages({
             if (result.success) {
               // If images are ready
               if (result.data.hasImages && result.data.images?.length > 0) {
-                // Update post with images
-                updatePostWithImages(postId, result.data.images)
-
-                // Stop polling for this post
-                stopPollingForPost(postId)
-
-                // Show success message
-                toast({
-                  title: "Images ready",
-                  description: `Images for post ${postId} have been generated successfully.`,
+                // Filter out blob URLs
+                const validImages = result.data.images.filter((img: any) => {
+                  return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
                 })
 
-                return { updated: true, postId }
+                if (validImages.length > 0) {
+                  // Update post with images
+                  updatePostWithImages(postId, validImages)
+
+                  // Stop polling for this post
+                  stopPollingForPost(postId)
+
+                  // Show success message
+                  toast({
+                    title: "Images ready",
+                    description: `Images for post ${postId} have been generated successfully.`,
+                  })
+
+                  return { updated: true, postId }
+                } else {
+                  // No valid images
+                  setErrorMessages((prev) => ({
+                    ...prev,
+                    [postId]: "No valid images were generated",
+                  }))
+                  stopPollingForPost(postId)
+                }
               }
               // If generation is complete but no images found
               else if (result.data.isComplete) {
                 // Try one more direct fetch
                 const finalResult = await checkImageGenerationStatus(postId)
                 if (finalResult.success && finalResult.data.hasImages && finalResult.data.images?.length > 0) {
-                  updatePostWithImages(postId, finalResult.data.images)
-                  stopPollingForPost(postId)
-                  return { updated: true, postId }
+                  // Filter out blob URLs
+                  const validImages = finalResult.data.images.filter((img: any) => {
+                    return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
+                  })
+
+                  if (validImages.length > 0) {
+                    updatePostWithImages(postId, validImages)
+                    stopPollingForPost(postId)
+                    return { updated: true, postId }
+                  } else {
+                    // No valid images
+                    setErrorMessages((prev) => ({
+                      ...prev,
+                      [postId]: "No valid images were generated",
+                    }))
+                    stopPollingForPost(postId)
+                  }
                 } else {
                   // Stop polling with error
                   setErrorMessages((prev) => ({
@@ -543,15 +645,37 @@ export default function GenerateMultipleImages({
 
         // If immediate results
         if (result.status === "completed" && result.images && result.images.length > 0) {
-          // Update post with images
-          updatePostWithImages(postId, result.images)
-
-          toast({
-            title: "Images generated",
-            description: `New images have been generated for post ${postId}.`,
+          // Filter out blob URLs
+          const validImages = result.images.filter((img: any) => {
+            return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
           })
 
-          return result
+          if (validImages.length > 0) {
+            // Update post with images
+            updatePostWithImages(postId, validImages)
+
+            toast({
+              title: "Images generated",
+              description: `New images have been generated for post ${postId}.`,
+            })
+
+            return result
+          } else {
+            // No valid images
+            setErrorMessages((prev) => ({
+              ...prev,
+              [postId]: "No valid images were generated",
+            }))
+
+            // Remove from generating set
+            setGeneratingPostIds((prev) => {
+              const next = new Set(prev)
+              next.delete(postId)
+              return next
+            })
+
+            return { success: false, error: "No valid images were generated" }
+          }
         } else {
           // No immediate images but not an error
           toast({
@@ -728,8 +852,15 @@ export default function GenerateMultipleImages({
           const result = await checkImageGenerationStatus(postId)
 
           if (result.success && result.data.hasImages && result.data.images?.length > 0) {
-            updatePostWithImages(postId, result.data.images)
-            stopPollingForPost(postId)
+            // Filter out blob URLs
+            const validImages = result.data.images.filter((img: any) => {
+              return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
+            })
+
+            if (validImages.length > 0) {
+              updatePostWithImages(postId, validImages)
+              stopPollingForPost(postId)
+            }
           }
         } catch (e) {
           console.error(`Error checking status for post ${postId} during manual refresh:`, e)
@@ -746,7 +877,14 @@ export default function GenerateMultipleImages({
         if (typeof post.id === "number") {
           const result = await checkImageGenerationStatus(post.id)
           if (result.success && result.data.hasImages && result.data.images?.length > 0) {
-            updatePostWithImages(post.id, result.data.images)
+            // Filter out blob URLs
+            const validImages = result.data.images.filter((img: any) => {
+              return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
+            })
+
+            if (validImages.length > 0) {
+              updatePostWithImages(post.id, validImages)
+            }
           }
         }
       }
@@ -777,10 +915,17 @@ export default function GenerateMultipleImages({
             const imagesData = JSON.parse(post.images)
             const images = imagesData.images?.images || imagesData.images || []
 
-            const updatedImages = images.map((img: any, idx: number) => ({
-              ...img,
-              isSelected: idx === imageIndex ? !img.isSelected : img.isSelected,
-            }))
+            // Skip if the image is a blob URL
+            if (images[imageIndex]?.url?.startsWith("blob:")) {
+              return post
+            }
+
+            const updatedImages = images.map((img: any, idx: number) => {
+              return {
+                ...img,
+                isSelected: idx === imageIndex ? !img.isSelected : img.isSelected,
+              }
+            })
 
             // Update main image URL if needed
             let newImageUrl = post.imageUrl
@@ -853,13 +998,25 @@ export default function GenerateMultipleImages({
           try {
             const imagesData = JSON.parse(post.images)
             const images = imagesData.images?.images || imagesData.images || []
-            const selectedImages = images.filter((img: any) => img.isSelected)
+
+            // Filter out blob URLs and invalid images
+            const validSelectedImages = images.filter((img: any) => {
+              return img.isSelected && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
+            })
 
             // Only save if there are selected non-placeholder images
-            if (selectedImages.length > 0 && !selectedImages[0].url.includes("placeholder.svg")) {
+            if (validSelectedImages.length > 0 && !validSelectedImages[0].url.includes("placeholder.svg")) {
               // Get the first selected image as the main image
-              const mainImageUrl = selectedImages[0].url
-              await saveImageSelection(post.id, JSON.stringify(imagesData), mainImageUrl)
+              const mainImageUrl = validSelectedImages[0].url
+
+              // Create sanitized images data
+              const sanitizedImagesData = {
+                images: images.filter((img: any) => {
+                  return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
+                }),
+              }
+
+              await saveImageSelection(post.id, JSON.stringify(sanitizedImagesData), mainImageUrl)
             }
           } catch (e) {
             console.error("Error saving final image selection:", e)
@@ -867,8 +1024,26 @@ export default function GenerateMultipleImages({
         }
       }
 
+      // Sanitize posts before passing them to onComplete
+      const sanitizedPosts = localPosts.map((post) => {
+        if (post.images) {
+          try {
+            const imagesData = JSON.parse(post.images)
+            const sanitizedData = sanitizeImagesData(imagesData)
+
+            return {
+              ...post,
+              images: JSON.stringify(sanitizedData),
+            }
+          } catch (e) {
+            console.error("Error sanitizing post images:", e)
+          }
+        }
+        return post
+      })
+
       // Call onComplete with updated posts
-      onComplete(localPosts)
+      onComplete(sanitizedPosts)
     } catch (error) {
       console.error("Error completing image generation:", error)
       toast({

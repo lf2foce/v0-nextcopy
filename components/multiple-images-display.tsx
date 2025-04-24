@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Image from "next/image"
+import { isValidImageUrl } from "@/lib/image-generation-utils"
 
 interface ImageData {
   url: string
@@ -44,9 +45,17 @@ export function MultipleImagesDisplay({
   onImageClick,
 }: MultipleImagesDisplayProps) {
   const [selectedIndex, setSelectedIndex] = useState(defaultImageIndex)
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({})
 
-  // Update the parsing logic to be more robust
-  // Parse the JSON string
+  // Handle image error
+  const handleImageError = (index: number) => {
+    setImageErrors((prev) => ({
+      ...prev,
+      [index]: true,
+    }))
+  }
+
+  // Parse the JSON string with improved error handling
   let imagesData: ImagesJson | null = null
   try {
     if (imagesJson) {
@@ -62,12 +71,17 @@ export function MultipleImagesDisplay({
     imagesData = { images: [] }
   }
 
-  // Filter to only show selected images if available
+  // Filter to only show valid images (no blob URLs)
   const allImages = imagesData?.images || []
-  const selectedImages = allImages.filter((img) => img.isSelected === true)
+  const validImages = allImages.filter((img) => {
+    return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
+  })
 
-  // Use selected images if available, otherwise fall back to all images
-  const imagesToDisplay = selectedImages.length > 0 ? selectedImages : allImages
+  // Filter to only show selected images if available
+  const selectedImages = validImages.filter((img) => img.isSelected === true)
+
+  // Use selected images if available, otherwise fall back to all valid images
+  const imagesToDisplay = selectedImages.length > 0 ? selectedImages : validImages
 
   // If no images data or no images to display, show placeholder or video
   if (!imagesToDisplay.length) {
@@ -110,24 +124,38 @@ export function MultipleImagesDisplay({
 
         {imagesToDisplay.length > 0 && (
           <div className="flex overflow-x-auto gap-3 pb-2 snap-x">
-            {imagesToDisplay.map((image, index) => (
-              <div
-                key={index}
-                className="relative flex-shrink-0 snap-center cursor-pointer"
-                style={{ width: "220px", height: "140px" }}
-                onClick={() => onImageClick && onImageClick(index)}
-              >
-                <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 text-xs rounded z-10">
-                  Style: {image.metadata?.style || "default"}
+            {imagesToDisplay.map((image, index) => {
+              const hasError = imageErrors[index] || !isValidImageUrl(image.url)
+
+              return (
+                <div
+                  key={index}
+                  className="relative flex-shrink-0 snap-center cursor-pointer"
+                  style={{ width: "220px", height: "140px" }}
+                  onClick={() => !hasError && onImageClick && onImageClick(index)}
+                >
+                  {hasError ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 border-2 border-gray-300 rounded-lg">
+                      <span className="text-xs text-gray-500 text-center px-2">Image unavailable</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 text-xs rounded z-10">
+                        Style: {image.metadata?.style || "default"}
+                      </div>
+                      <Image
+                        src={image.url || "/placeholder.svg?text=No+Image"}
+                        alt={`Image ${index + 1}`}
+                        fill
+                        className="object-cover rounded-lg border-2 border-black"
+                        onError={() => handleImageError(index)}
+                        unoptimized // Skip optimization to avoid issues with external URLs
+                      />
+                    </>
+                  )}
                 </div>
-                <Image
-                  src={image.url || "/placeholder.svg"}
-                  alt={`Image ${index + 1}`}
-                  fill
-                  className="object-cover rounded-lg border-2 border-black"
-                />
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -150,43 +178,67 @@ export function MultipleImagesDisplay({
           className="relative aspect-video w-full overflow-hidden rounded-lg bg-gray-100 border-4 border-black cursor-pointer"
           onClick={() => onImageClick && onImageClick(selectedIndex)}
         >
-          <Image
-            src={selectedImage.url || "/placeholder.svg"}
-            alt={selectedImage.prompt || "Post image"}
-            fill
-            className="object-cover"
-          />
-          <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 text-xs rounded">
-            Style: {selectedImage.metadata?.style || "default"}
-          </div>
+          {imageErrors[selectedIndex] || !isValidImageUrl(selectedImage.url) ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100">
+              <span className="text-gray-500">Image unavailable</span>
+            </div>
+          ) : (
+            <>
+              <Image
+                src={selectedImage.url || "/placeholder.svg?text=No+Image"}
+                alt={selectedImage.prompt || "Post image"}
+                fill
+                className="object-cover"
+                onError={() => handleImageError(selectedIndex)}
+                unoptimized // Skip optimization to avoid issues with external URLs
+              />
+              <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 text-xs rounded">
+                Style: {selectedImage.metadata?.style || "default"}
+              </div>
+            </>
+          )}
         </div>
       )}
 
       {/* Thumbnails */}
       {imagesToDisplay.length > 1 && (
         <div className="grid grid-cols-4 gap-2">
-          {imagesToDisplay.map((image, index) => (
-            <button
-              key={index}
-              onClick={(e) => {
-                handleSelectImage(index)
-                if (onImageClick) {
-                  e.stopPropagation()
-                  onImageClick(index)
-                }
-              }}
-              className={`relative aspect-square overflow-hidden rounded-md ${
-                index === selectedIndex ? "ring-2 ring-primary ring-offset-2" : "opacity-70"
-              }`}
-            >
-              <Image
-                src={image.url || "/placeholder.svg"}
-                alt={`Thumbnail ${index + 1}`}
-                fill
-                className="object-cover"
-              />
-            </button>
-          ))}
+          {imagesToDisplay.map((image, index) => {
+            const hasError = imageErrors[index] || !isValidImageUrl(image.url)
+
+            return (
+              <button
+                key={index}
+                onClick={(e) => {
+                  if (!hasError) {
+                    handleSelectImage(index)
+                    if (onImageClick) {
+                      e.stopPropagation()
+                      onImageClick(index)
+                    }
+                  }
+                }}
+                className={`relative aspect-square overflow-hidden rounded-md ${
+                  index === selectedIndex && !hasError ? "ring-2 ring-primary ring-offset-2" : "opacity-70"
+                } ${hasError ? "cursor-not-allowed" : "cursor-pointer"}`}
+              >
+                {hasError ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100">
+                    <span className="text-xs text-gray-500">Error</span>
+                  </div>
+                ) : (
+                  <Image
+                    src={image.url || "/placeholder.svg?text=No+Image"}
+                    alt={`Thumbnail ${index + 1}`}
+                    fill
+                    className="object-cover"
+                    onError={() => handleImageError(index)}
+                    unoptimized // Skip optimization to avoid issues with external URLs
+                  />
+                )}
+              </button>
+            )
+          })}
         </div>
       )}
     </div>

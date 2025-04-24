@@ -5,7 +5,8 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import Image from "next/image"
 import type { Post } from "./campaign-workflow"
-import { RefreshCw, Loader2, Check, AlertCircle, MinusCircle, PlusCircle, ChevronDown } from "lucide-react"
+import { RefreshCw, Loader2, Check, AlertCircle, MinusCircle, PlusCircle, ChevronDown, ImageIcon } from "lucide-react"
+import { getPostImages, hasRealImages } from "@/lib/image-generation-utils"
 
 // Available image styles
 export const IMAGE_STYLES = [
@@ -26,19 +27,6 @@ export const IMAGE_SERVICES = [
   { value: "ideogram", label: "Ideogram" },
 ]
 
-export interface PostImage {
-  url: string
-  prompt: string
-  order: number
-  isSelected: boolean
-  metadata?: {
-    width: number
-    height: string
-    style: string
-    service?: string
-  }
-}
-
 interface PostImageCardProps {
   post: Post
   index: number
@@ -55,24 +43,6 @@ interface PostImageCardProps {
   onChangeNumImages: (postId: string | number, value: number) => void
   onChangeImageStyle: (postId: string | number, style: string) => void
   onChangeImageService: (postId: string | number, service: string) => void
-}
-
-export function getPostImages(post: Post): PostImage[] {
-  if (!post.images) return []
-
-  try {
-    const imagesData = JSON.parse(post.images)
-    return imagesData.images?.images || imagesData.images || []
-  } catch (e) {
-    console.error("Error parsing images JSON:", e)
-    return []
-  }
-}
-
-export function hasRealImages(post: Post): boolean {
-  const images = getPostImages(post)
-  if (images.length === 0) return false
-  return images.some((img) => !img.url.includes("placeholder.svg"))
 }
 
 export default function PostImageCard({
@@ -105,6 +75,9 @@ export default function PostImageCard({
   const [serviceDropdownOpen, setServiceDropdownOpen] = useState(false)
   const styleDropdownRef = useRef<HTMLDivElement>(null)
   const serviceDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Track image loading errors
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({})
 
   // Track viewport size
   const [isMobile, setIsMobile] = useState(false)
@@ -163,6 +136,14 @@ export default function PostImageCard({
     e.stopPropagation()
     onChangeImageService(post.id, service)
     setServiceDropdownOpen(false)
+  }
+
+  // Handle image error
+  const handleImageError = (imageIndex: number) => {
+    setImageErrors((prev) => ({
+      ...prev,
+      [imageIndex]: true,
+    }))
   }
 
   return (
@@ -310,34 +291,58 @@ export default function PostImageCard({
         ) : hasGeneratedImages ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {postImages.map((image, imageIndex) => (
-                <div
-                  key={imageIndex}
-                  onClick={() => onToggleImageSelection(post.id, imageIndex)}
-                  className={`relative border-4 ${
-                    image.isSelected ? "border-green-500" : "border-black"
-                  } rounded-md overflow-hidden h-40 cursor-pointer`}
-                >
-                  <Image
-                    src={image.url || "/placeholder.svg"}
-                    alt={`Image ${imageIndex + 1} for post ${index + 1}`}
-                    fill
-                    className="object-cover"
-                  />
+              {postImages.map((image, imageIndex) => {
+                // Skip rendering blob URLs entirely
+                const isBlobUrl = image.url?.startsWith("blob:")
+                const hasError = imageErrors[imageIndex] || isBlobUrl
+
+                return (
                   <div
-                    className={`absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded-full ${
-                      image.isSelected ? "bg-green-500 text-white" : "bg-white border-2 border-black"
-                    }`}
+                    key={imageIndex}
+                    onClick={() => !hasError && onToggleImageSelection(post.id, imageIndex)}
+                    className={`relative border-4 ${
+                      image.isSelected && !hasError ? "border-green-500" : "border-black"
+                    } rounded-md overflow-hidden h-40 cursor-pointer ${hasError ? "cursor-not-allowed" : ""}`}
                   >
-                    {image.isSelected && <Check size={16} />}
+                    {hasError ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100">
+                        <ImageIcon size={32} className="text-gray-400 mb-2" />
+                        <span className="text-xs text-gray-500 text-center px-2">
+                          {isBlobUrl ? "Blob URL not supported" : "Image unavailable"}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="relative w-full h-full">
+                        <Image
+                          src={image.url || "/placeholder.svg?text=No+Image"}
+                          alt={image.prompt || `Image ${imageIndex + 1}`}
+                          fill
+                          className="object-cover"
+                          onError={() => handleImageError(imageIndex)}
+                          unoptimized // Skip optimization to avoid issues with external URLs
+                        />
+                      </div>
+                    )}
+
+                    {!hasError && (
+                      <>
+                        <div
+                          className={`absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded-full ${
+                            image.isSelected ? "bg-green-500 text-white" : "bg-white border-2 border-black"
+                          }`}
+                        >
+                          {image.isSelected && <Check size={16} />}
+                        </div>
+                        <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                          {image.metadata?.service
+                            ? `${image.metadata.service} - ${image.metadata.style || imageStyle}`
+                            : `Style: ${image.metadata?.style || imageStyle}`}
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                    {image.metadata?.service
-                      ? `${image.metadata.service} - ${image.metadata.style || imageStyle}`
-                      : `Style: ${image.metadata?.style || imageStyle}`}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
             <p className="text-sm text-gray-600">Click on an image to select or deselect it.</p>
           </div>
