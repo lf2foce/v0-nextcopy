@@ -6,6 +6,14 @@ import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { desc } from "drizzle-orm"
 
+// Add this helper function at the top of the file
+function getSiteUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000")
+  )
+}
+
 // Define types for CampaignType and ThemeType
 type CampaignType = {
   id: number
@@ -88,7 +96,8 @@ export async function generateThemes(campaignId: number) {
     }
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/copy/themes/generate`, {
+      const siteUrl = getSiteUrl()
+      const response = await fetch(`${siteUrl}/api/copy/themes/generate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -185,7 +194,8 @@ export async function selectTheme(themeId: number) {
     console.log(`Selecting theme ${themeId} via external API`)
 
     // Use the external API via our proxy endpoint
-    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/copy/themes/select`, {
+    const siteUrl = getSiteUrl()
+    const response = await fetch(`${siteUrl}/api/copy/themes/select`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -300,9 +310,12 @@ export async function generateImagesForPost(
       `Generating ${numImages} images with style "${imageStyle}" using service "${imageService}" for post ${postId}`,
     )
 
-    // Call our API route that will call the FastAPI backend
+    // Get the site URL from environment variables with a fallback
+    const siteUrl = getSiteUrl()
+
+    // Call our API route with absolute URL
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL}/api/posts/${postId}/generate-images?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}&image_service=${encodeURIComponent(imageService)}`,
+      `${siteUrl}/api/posts/${postId}/generate-images?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}&image_service=${encodeURIComponent(imageService)}`,
       {
         method: "POST",
         headers: {
@@ -456,7 +469,8 @@ export async function postToSocialMedia(postId: number, platform: string, conten
     console.log(`Posting to ${platform} for post ID ${postId}`)
 
     // Call the API route - note we're not using content parameter anymore
-    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/social/${platform}/post`, {
+    const siteUrl = getSiteUrl()
+    const response = await fetch(`${siteUrl}/api/social/${platform}/post`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -561,7 +575,8 @@ export async function getAllCampaigns() {
 // Save image selection to database
 export async function saveImageSelection(postId: number, images: string, mainImageUrl: string) {
   try {
-    const response = await fetch(`/api/posts/${postId}/update-images`, {
+    const siteUrl = getSiteUrl()
+    const response = await fetch(`${siteUrl}/api/posts/${postId}/update-images`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -595,7 +610,8 @@ export async function saveImageSelection(postId: number, images: string, mainIma
 // Clear images for a post
 export async function clearPostImages(postId: number, placeholderImages: any) {
   try {
-    const response = await fetch(`/api/posts/${postId}/update-images`, {
+    const siteUrl = getSiteUrl()
+    const response = await fetch(`${siteUrl}/api/posts/${postId}/update-images`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -633,8 +649,9 @@ export async function processImageGeneration(
       `Processing image generation: ${numImages} images with style "${imageStyle}" using service "${imageService}" for post ${postId}`,
     )
 
+    const siteUrl = getSiteUrl()
     const response = await fetch(
-      `/api/posts/${postId}/generate-images?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}&image_service=${encodeURIComponent(imageService)}`,
+      `${siteUrl}/api/posts/${postId}/generate-images?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}&image_service=${encodeURIComponent(imageService)}`,
       {
         method: "POST",
         headers: {
