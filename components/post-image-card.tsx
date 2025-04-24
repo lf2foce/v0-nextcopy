@@ -140,6 +140,7 @@ export default function PostImageCard({
 
   // Handle image error
   const handleImageError = (imageIndex: number) => {
+    console.log(`Image error at index ${imageIndex}`)
     setImageErrors((prev) => ({
       ...prev,
       [imageIndex]: true,
@@ -294,6 +295,8 @@ export default function PostImageCard({
               {postImages.map((image, imageIndex) => {
                 // Skip rendering blob URLs entirely
                 const isBlobUrl = image.url?.startsWith("blob:")
+                // Check for tinyurl links that might be problematic
+                const isTinyUrl = image.url?.includes("tinyurl.com")
                 const hasError = imageErrors[imageIndex] || isBlobUrl
 
                 return (
@@ -304,10 +307,12 @@ export default function PostImageCard({
                       image.isSelected && !hasError ? "border-green-500" : "border-black"
                     } rounded-md overflow-hidden h-40 cursor-pointer ${hasError ? "cursor-not-allowed" : ""}`}
                   >
-                    {isBlobUrl ? (
+                    {isBlobUrl || hasError ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100">
                         <ImageIcon size={32} className="text-gray-400 mb-2" />
-                        <span className="text-xs text-gray-500 text-center px-2">Blob URL not supported</span>
+                        <span className="text-xs text-gray-500 text-center px-2">
+                          {isBlobUrl ? "Blob URL not supported" : "Image unavailable"}
+                        </span>
                       </div>
                     ) : (
                       <div className="relative w-full h-full">
@@ -318,6 +323,7 @@ export default function PostImageCard({
                           className="object-cover"
                           onError={() => handleImageError(imageIndex)}
                           unoptimized // Skip optimization to avoid issues with external URLs
+                          loading="eager" // Load immediately to detect errors faster
                         />
                       </div>
                     )}

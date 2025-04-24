@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import type { Campaign, Theme } from "../campaign-workflow"
 import { Loader2, RefreshCw } from "lucide-react"
-import { generateThemes, selectTheme } from "@/lib/actions_api" // Updated import
+import { generateThemes, selectTheme } from "@/lib/actions_api"
 import { useToast } from "@/hooks/use-toast"
 
 interface GenerateSelectThemeProps {
@@ -18,6 +18,13 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
   const [themes, setThemes] = useState<Theme[]>([])
   const [selectedThemeId, setSelectedThemeId] = useState<string | number | null>(null)
   const { toast } = useToast()
+
+  // Add a new state for custom theme at the top of the component with the other state declarations
+  const [customTheme, setCustomTheme] = useState<Theme | null>(null)
+  const [customThemeTitle, setCustomThemeTitle] = useState("")
+  const [customThemeDescription, setCustomThemeDescription] = useState("")
+  const [isEditingCustomTheme, setIsEditingCustomTheme] = useState(false)
+  const [isSavingCustomTheme, setIsSavingCustomTheme] = useState(false)
 
   // Generate themes when component mounts
   useEffect(() => {
@@ -80,6 +87,98 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
     setSelectedThemeId(themeId)
   }
 
+  // Function to save custom theme to database
+  const saveCustomThemeToDatabase = async (customTheme: Theme): Promise<Theme | null> => {
+    if (!campaign.id) {
+      toast({
+        title: "Error",
+        description: "Campaign ID is missing. Cannot save custom theme.",
+        variant: "destructive",
+      })
+      return null
+    }
+
+    try {
+      setIsSavingCustomTheme(true)
+
+      // Prepare theme data for database
+      const themeData = {
+        campaignId: campaign.id,
+        title: customTheme.title || "",
+        story: customTheme.story || "",
+        isSelected: true, // Mark as selected by default
+        status: "selected",
+        post_status: "pending", // Start with pending status
+      }
+
+      // Use server action to save the theme
+      // We'll create a new function in lib/actions_api.ts to handle this
+      const response = await fetch("/api/themes/create-custom", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(themeData),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to save custom theme: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to save custom theme")
+      }
+
+      // Return the saved theme with database ID
+      return result.data
+    } catch (error) {
+      console.error("Error saving custom theme:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save custom theme: " + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive",
+      })
+      return null
+    } finally {
+      setIsSavingCustomTheme(false)
+    }
+  }
+
+  // Add this function to handle custom theme creation after the handleThemeSelection function
+  const handleCreateCustomTheme = () => {
+    if (!customThemeTitle.trim()) {
+      toast({
+        title: "Error",
+        description: "Theme title is required",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const newCustomTheme: Theme = {
+      id: `custom-${Date.now()}`,
+      title: customThemeTitle,
+      story: customThemeDescription,
+      campaignId: campaign.id,
+      isSelected: false,
+      status: "pending",
+    }
+
+    setCustomTheme(newCustomTheme)
+    setSelectedThemeId(newCustomTheme.id)
+    setIsEditingCustomTheme(false)
+  }
+
+  // Add this function to toggle the custom theme editor
+  const toggleCustomThemeEditor = () => {
+    setIsEditingCustomTheme(!isEditingCustomTheme)
+    if (!isEditingCustomTheme) {
+      setSelectedThemeId(null)
+    }
+  }
+
   // Function to handle theme selection and continue
   const handleContinue = async () => {
     if (!selectedThemeId) {
@@ -91,19 +190,63 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
       return
     }
 
-    const selectedTheme = themes.find((theme) => theme.id === selectedThemeId)
-    if (!selectedTheme) {
-      toast({
-        title: "Error",
-        description: "Selected theme not found",
-        variant: "destructive",
-      })
-      return
-    }
-
     setIsSelecting(true)
 
     try {
+      // Check if we're using a custom theme
+      if (selectedThemeId.toString().startsWith("custom-") && customTheme) {
+        // For custom themes, we need to save it to the database first
+        const savedCustomTheme = await saveCustomThemeToDatabase(customTheme)
+
+        if (!savedCustomTheme) {
+          setIsSelecting(false)
+          return
+        }
+
+        // Now select the saved theme to trigger content generation
+        if (typeof savedCustomTheme.id === "number") {
+          const result = await selectTheme(savedCustomTheme.id)
+
+          if (!result.success) {
+            toast({
+              title: "Error",
+              description: result.error || "Failed to select custom theme",
+              variant: "destructive",
+            })
+            setIsSelecting(false)
+            return
+          }
+
+          toast({
+            title: "Custom theme selected",
+            description: `Theme "${savedCustomTheme.title}" has been selected.`,
+          })
+
+          // Move to the next step with the saved custom theme
+          onThemeSelected(savedCustomTheme)
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to get proper ID for custom theme",
+            variant: "destructive",
+          })
+          setIsSelecting(false)
+        }
+        return
+      }
+
+      // Original code for API-generated themes
+      const selectedTheme = themes.find((theme) => theme.id === selectedThemeId)
+      if (!selectedTheme) {
+        toast({
+          title: "Error",
+          description: "Selected theme not found",
+          variant: "destructive",
+        })
+        setIsSelecting(false)
+        return
+      }
+
       // Only call selectTheme if the theme has a numeric ID (saved in database)
       if (typeof selectedTheme.id === "number") {
         const result = await selectTheme(selectedTheme.id)
@@ -136,6 +279,8 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
       setIsSelecting(false)
     }
   }
+
+  const allThemes = [...themes]
 
   return (
     <div className="space-y-6">
@@ -182,8 +327,8 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
             </button>
           </div>
 
-          <div className="space-y-4">
-            {themes.map((theme) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {allThemes.map((theme) => (
               <div
                 key={theme.id}
                 className={`border-4 ${selectedThemeId === theme.id ? "border-yellow-400 bg-yellow-50" : "border-black"} rounded-md p-4 cursor-pointer transition-all`}
@@ -218,6 +363,113 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
                 </div>
               </div>
             ))}
+
+            {/* Custom Theme Option */}
+            <div
+              className={`border-4 ${selectedThemeId === customTheme?.id ? "border-yellow-400 bg-yellow-50" : "border-black"} rounded-md p-4 cursor-pointer transition-all ${isEditingCustomTheme ? "col-span-full" : ""}`}
+              onClick={() =>
+                !isSelecting && !isEditingCustomTheme && customTheme && handleThemeSelection(customTheme.id)
+              }
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-1">
+                  {!isEditingCustomTheme && (
+                    <input
+                      type="radio"
+                      checked={customTheme && selectedThemeId === customTheme.id}
+                      onChange={() => customTheme && handleThemeSelection(customTheme.id)}
+                      className="w-4 h-4"
+                      disabled={!customTheme}
+                    />
+                  )}
+                </div>
+                <div className="flex-1">
+                  {isEditingCustomTheme ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label htmlFor="customThemeTitle" className="block font-bold mb-1">
+                          Theme Title
+                        </label>
+                        <input
+                          id="customThemeTitle"
+                          type="text"
+                          value={customThemeTitle}
+                          onChange={(e) => setCustomThemeTitle(e.target.value)}
+                          className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                          placeholder="Enter your theme title"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="customThemeDescription" className="block font-bold mb-1">
+                          Theme Description
+                        </label>
+                        <textarea
+                          id="customThemeDescription"
+                          value={customThemeDescription}
+                          onChange={(e) => setCustomThemeDescription(e.target.value)}
+                          className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400 min-h-[100px]"
+                          placeholder="Describe your theme"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleCreateCustomTheme()
+                          }}
+                          className="py-2 px-4 bg-green-400 border-2 border-black rounded-md font-medium hover:bg-green-500"
+                        >
+                          Save Custom Theme
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setIsEditingCustomTheme(false)
+                          }}
+                          className="py-2 px-4 bg-gray-200 border-2 border-black rounded-md font-medium hover:bg-gray-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : customTheme ? (
+                    <>
+                      <h3 className="font-bold text-lg">{customTheme.title}</h3>
+                      <p className="text-gray-700 mb-2">{customTheme.story}</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setCustomThemeTitle(customTheme.title || "")
+                            setCustomThemeDescription(customTheme.story || "")
+                            setIsEditingCustomTheme(true)
+                          }}
+                          className="py-1 px-3 bg-blue-300 border-2 border-black rounded-md hover:bg-blue-400 text-sm"
+                        >
+                          Edit Custom Theme
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="font-bold text-lg">Create Your Own Theme</h3>
+                      <p className="text-gray-700 mb-2">
+                        Don't like the generated themes? Create your own custom theme.
+                      </p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleCustomThemeEditor()
+                        }}
+                        className="py-1 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 text-sm"
+                      >
+                        Create Custom Theme
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="flex gap-4">
@@ -231,13 +483,13 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
 
             <button
               onClick={handleContinue}
-              disabled={!selectedThemeId || isSelecting}
+              disabled={!selectedThemeId || isSelecting || isSavingCustomTheme}
               className="flex-1 py-3 px-6 bg-green-400 border-4 border-black rounded-md font-bold text-lg hover:bg-green-500 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:opacity-70"
             >
-              {isSelecting ? (
+              {isSelecting || isSavingCustomTheme ? (
                 <span className="flex items-center justify-center">
                   <Loader2 className="animate-spin mr-2" size={20} />
-                  Processing...
+                  {isSavingCustomTheme ? "Saving Custom Theme..." : "Processing..."}
                 </span>
               ) : (
                 "Select Content"

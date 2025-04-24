@@ -172,9 +172,27 @@ export default function GenerateMultipleImages({
     [forceRefresh],
   )
 
+  // Add a function to preload and validate images
+  const preloadAndValidateImage = (url: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (!url || url.includes("placeholder.svg") || url.startsWith("blob:")) {
+        resolve(false)
+        return
+      }
+
+      const img = new Image()
+      img.onload = () => resolve(true)
+      img.onerror = () => resolve(false)
+      img.src = url
+
+      // Set a timeout to prevent hanging
+      setTimeout(() => resolve(false), 5000)
+    })
+  }
+
   // Update post with new images
   const updatePostWithImages = useCallback(
-    (postId: number, images: any[]) => {
+    async (postId: number, images: any[]) => {
       // Filter out blob URLs and invalid images
       const validImages = images.filter((img) => {
         return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
@@ -191,9 +209,25 @@ export default function GenerateMultipleImages({
         return
       }
 
+      // Preload and validate images
+      const validationPromises = validImages.map((img) => preloadAndValidateImage(img.url))
+      const validationResults = await Promise.all(validationPromises)
+
+      // Filter out images that failed validation
+      const confirmedValidImages = validImages.filter((_, index) => validationResults[index])
+
+      if (confirmedValidImages.length === 0) {
+        setErrorMessages((prev) => ({
+          ...prev,
+          [postId]: "All images failed to load",
+        }))
+        stopPollingForPost(postId)
+        return
+      }
+
       // Format images data
       const formattedData = {
-        images: validImages.map((img, idx) => ({
+        images: confirmedValidImages.map((img, idx) => ({
           ...img,
           isSelected: true,
           order: idx,
@@ -207,7 +241,7 @@ export default function GenerateMultipleImages({
             return {
               ...post,
               images: JSON.stringify(formattedData),
-              imageUrl: validImages[0]?.url || post.imageUrl,
+              imageUrl: confirmedValidImages[0]?.url || post.imageUrl,
             }
           }
           return post
@@ -250,7 +284,7 @@ export default function GenerateMultipleImages({
       if (typeof postId === "number") {
         setTimeout(async () => {
           try {
-            await saveImageSelection(postId, JSON.stringify(formattedData), validImages[0]?.url || "")
+            await saveImageSelection(postId, JSON.stringify(formattedData), confirmedValidImages[0]?.url || "")
           } catch (error) {
             console.error("Error saving images to database:", error)
           }

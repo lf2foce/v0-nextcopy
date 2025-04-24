@@ -13,7 +13,7 @@ export interface PostImage {
   }
 }
 
-// Update the isValidImageUrl function to be more strict about rejecting blob URLs
+// Update the isValidImageUrl function to be more strict
 export function isValidImageUrl(url: string | undefined): boolean {
   if (!url) return false
 
@@ -22,8 +22,15 @@ export function isValidImageUrl(url: string | undefined): boolean {
     return false
   }
 
-  // Only accept http/https URLs, data URLs, or local paths
-  return url.startsWith("http") || url.startsWith("/") || url.startsWith("data:image/")
+  // Check for common URL patterns
+  const isValidPattern = url.startsWith("http") || url.startsWith("/") || url.startsWith("data:image/")
+
+  // Additional check for tinyurl links that might be problematic
+  if (url.includes("tinyurl.com")) {
+    console.warn("Potentially problematic tinyurl detected:", url)
+  }
+
+  return isValidPattern
 }
 
 // Generate placeholder images for a post
@@ -43,7 +50,7 @@ export function generatePlaceholderImages(postId: string | number): PostImage[] 
   ]
 }
 
-// Get images from a post with improved error handling
+// Update the getPostImages function to better handle errors
 export function getPostImages(post: Post): PostImage[] {
   if (!post.images) return []
 

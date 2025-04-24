@@ -154,6 +154,7 @@ export function MultipleImagesDisplay({
                         className="object-cover rounded-lg border-2 border-black"
                         onError={() => handleImageError(index)}
                         unoptimized // Skip optimization to avoid issues with external URLs
+                        loading="eager" // Load immediately to detect errors faster
                       />
                     </>
                   )}
