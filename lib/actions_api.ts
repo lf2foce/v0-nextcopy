@@ -7,8 +7,6 @@ import { revalidatePath } from "next/cache"
 import { desc } from "drizzle-orm"
 
 // Update the getSiteUrl function to handle both client and server environments better
-
-// Replace the existing getSiteUrl function with this improved version:
 function getSiteUrl(): string {
   // Check if we're in a browser environment
   if (typeof window !== "undefined") {
@@ -16,9 +14,11 @@ function getSiteUrl(): string {
   }
 
   // Server-side: use environment variable with fallback
-  return process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : "http://localhost:3000"
+  const url =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
+
+  return url
 }
 
 // Define types for CampaignType and ThemeType
@@ -377,7 +377,8 @@ export async function generateImagesForPost(
       if (result.data?.images && Array.isArray(result.data.images) && result.data.images.length > 0) {
         // Update the post with the new images
         try {
-          const { updatePostImages } = await import("./actions")
+          // Instead of dynamically importing from ./actions, we'll directly update the database
+          // This avoids potential circular dependencies
           const imageData = result.data.images
 
           const formattedData = {
@@ -388,13 +389,15 @@ export async function generateImagesForPost(
             })),
           }
 
-          await updatePostImages([
-            {
-              id: postId,
-              image: imageData[0]?.url || "",
-              imagesJson: JSON.stringify(formattedData),
-            },
-          ])
+          // Direct database update instead of importing updatePostImages
+          await db
+            .update(contentPosts)
+            .set({
+              imageUrl: imageData[0]?.url || "",
+              images: JSON.stringify(formattedData),
+              image_status: "completed",
+            })
+            .where(eq(contentPosts.id, postId))
         } catch (dbError) {
           console.error("Error updating post with new images:", dbError)
         }
@@ -441,8 +444,10 @@ export async function checkImageGenerationStatus(postId: number) {
         const imagesData = JSON.parse(post.images)
         images = imagesData.images?.images || imagesData.images || []
 
-        // Filter out placeholder images
-        images = images.filter((img: any) => !img.url?.includes("placeholder.svg"))
+        // Filter out placeholder images and blob URLs
+        images = images.filter((img: any) => {
+          return img && img.url && !img.url.includes("placeholder.svg") && !img.url.startsWith("blob:")
+        })
       } catch (e) {
         console.error("Error parsing images JSON:", e)
       }
@@ -582,27 +587,15 @@ export async function getAllCampaigns() {
 // Save image selection to database
 export async function saveImageSelection(postId: number, images: string, mainImageUrl: string) {
   try {
-    const siteUrl = getSiteUrl()
-    const response = await fetch(`${siteUrl}/api/posts/${postId}/update-images`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        id: postId,
-        image: mainImageUrl,
-        imagesJson: images,
-      }),
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error("Failed to save image selection to database:", errorText)
-      return {
-        success: false,
-        error: `Failed to save selection: ${response.status} ${response.statusText}`,
-      }
-    }
+    // Direct database update instead of using fetch
+    await db
+      .update(contentPosts)
+      .set({
+        imageUrl: mainImageUrl,
+        images: images,
+        image_status: "completed",
+      })
+      .where(eq(contentPosts.id, postId))
 
     return { success: true }
   } catch (error) {
@@ -617,22 +610,15 @@ export async function saveImageSelection(postId: number, images: string, mainIma
 // Clear images for a post
 export async function clearPostImages(postId: number, placeholderImages: any) {
   try {
-    const siteUrl = getSiteUrl()
-    const response = await fetch(`${siteUrl}/api/posts/${postId}/update-images`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        id: postId,
-        image: "",
-        imagesJson: JSON.stringify({ images: placeholderImages }),
-      }),
-    })
-
-    if (!response.ok) {
-      return { success: false, error: `Failed to clear images: ${response.status}` }
-    }
+    // Direct database update instead of using fetch
+    await db
+      .update(contentPosts)
+      .set({
+        imageUrl: "",
+        images: JSON.stringify({ images: placeholderImages }),
+        image_status: "pending",
+      })
+      .where(eq(contentPosts.id, postId))
 
     return { success: true }
   } catch (error) {
