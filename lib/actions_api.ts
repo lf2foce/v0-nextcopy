@@ -6,12 +6,19 @@ import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { desc } from "drizzle-orm"
 
-// Add this helper function at the top of the file
+// Update the getSiteUrl function to handle both client and server environments better
+
+// Replace the existing getSiteUrl function with this improved version:
 function getSiteUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000")
-  )
+  // Check if we're in a browser environment
+  if (typeof window !== "undefined") {
+    return window.location.origin
+  }
+
+  // Server-side: use environment variable with fallback
+  return process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "http://localhost:3000"
 }
 
 // Define types for CampaignType and ThemeType

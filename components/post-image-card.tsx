@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import Image from "next/image"
 import type { Post } from "./campaign-workflow"
 import { RefreshCw, Loader2, Check, AlertCircle, MinusCircle, PlusCircle, ChevronDown } from "lucide-react"
@@ -96,11 +96,49 @@ export default function PostImageCard({
   const postImages = getPostImages(post)
   const hasGeneratedImages = hasRealImages(post)
 
+  // Get post title - use content as fallback if no title
+  const postTitle =
+    post.title || post.content?.substring(0, 30) + (post.content?.length > 30 ? "..." : "") || `Post ${index + 1}`
+
   // Dropdown state
   const [styleDropdownOpen, setStyleDropdownOpen] = useState(false)
   const [serviceDropdownOpen, setServiceDropdownOpen] = useState(false)
   const styleDropdownRef = useRef<HTMLDivElement>(null)
   const serviceDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Track viewport size
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Check viewport size on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640)
+    }
+
+    // Initial check
+    checkMobile()
+
+    // Add resize listener
+    window.addEventListener("resize", checkMobile)
+
+    // Cleanup
+    return () => window.removeEventListener("resize", checkMobile)
+  }, [])
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (styleDropdownRef.current && !styleDropdownRef.current.contains(event.target as Node)) {
+        setStyleDropdownOpen(false)
+      }
+      if (serviceDropdownRef.current && !serviceDropdownRef.current.contains(event.target as Node)) {
+        setServiceDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
 
   // Handle dropdown clicks
   const toggleStyleDropdown = (e: React.MouseEvent) => {
@@ -129,23 +167,24 @@ export default function PostImageCard({
 
   return (
     <div className="border-4 border-black rounded-md overflow-hidden bg-white">
-      <div className="p-4 bg-yellow-100 border-b-4 border-black flex justify-between items-center">
-        <h3 className="font-bold text-lg">Post {index + 1}</h3>
-        <div className="flex items-center gap-4">
-          {hasGeneratedImages && (
-            <span className="text-sm font-medium">
-              {postImages.filter((img) => img.isSelected).length} of {postImages.length} selected
-            </span>
-          )}
+      <div className="p-4 bg-yellow-100 border-b-4 border-black">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {/* Selection count */}
+          <div className="text-sm font-medium">
+            {hasGeneratedImages
+              ? `${postImages.filter((img) => img.isSelected).length} of ${postImages.length} selected`
+              : "No images selected"}
+          </div>
 
-          {/* Image generation controls */}
-          <div className="flex items-center gap-2">
+          {/* Image generation controls - now more responsive */}
+          <div className="flex flex-wrap items-center gap-2">
             {/* Number of images selector */}
             <div className="flex items-center gap-2 bg-white border-2 border-black rounded-md px-2 py-1">
               <button
                 onClick={() => onChangeNumImages(post.id, Math.max(1, numImages - 1))}
                 disabled={numImages <= 1 || isProcessing}
                 className="text-black hover:text-gray-700 disabled:opacity-50"
+                aria-label="Decrease number of images"
               >
                 <MinusCircle size={16} />
               </button>
@@ -154,19 +193,22 @@ export default function PostImageCard({
                 onClick={() => onChangeNumImages(post.id, Math.min(10, numImages + 1))}
                 disabled={numImages >= 10 || isProcessing}
                 className="text-black hover:text-gray-700 disabled:opacity-50"
+                aria-label="Increase number of images"
               >
                 <PlusCircle size={16} />
               </button>
             </div>
 
-            {/* Style selector dropdown */}
+            {/* Style selector dropdown - responsive width */}
             <div className="relative" ref={styleDropdownRef}>
               <button
                 onClick={toggleStyleDropdown}
                 disabled={isProcessing}
-                className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 py-1 text-sm w-32 disabled:opacity-50"
+                className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 py-1 text-sm w-24 sm:w-32 disabled:opacity-50"
               >
-                <span>{IMAGE_STYLES.find((style) => style.value === imageStyle)?.label || "Realistic"}</span>
+                <span className="truncate">
+                  {IMAGE_STYLES.find((style) => style.value === imageStyle)?.label || "Realistic"}
+                </span>
                 <ChevronDown size={14} className={styleDropdownOpen ? "transform rotate-180" : ""} />
               </button>
 
@@ -187,14 +229,16 @@ export default function PostImageCard({
               )}
             </div>
 
-            {/* Image service selector dropdown */}
+            {/* Image service selector dropdown - responsive width */}
             <div className="relative" ref={serviceDropdownRef}>
               <button
                 onClick={toggleServiceDropdown}
                 disabled={isProcessing}
-                className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 py-1 text-sm w-32 disabled:opacity-50"
+                className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 py-1 text-sm w-24 sm:w-32 disabled:opacity-50"
               >
-                <span>{IMAGE_SERVICES.find((service) => service.value === imageService)?.label || "Flux"}</span>
+                <span className="truncate">
+                  {IMAGE_SERVICES.find((service) => service.value === imageService)?.label || "Flux"}
+                </span>
                 <ChevronDown size={14} className={serviceDropdownOpen ? "transform rotate-180" : ""} />
               </button>
 
@@ -215,10 +259,12 @@ export default function PostImageCard({
               )}
             </div>
 
+            {/* Regenerate button - full width on mobile */}
             <button
               onClick={() => onRegenerateImages(post.id)}
               disabled={isProcessing || isSubmitting}
-              className="py-1 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 flex items-center gap-1 text-sm disabled:opacity-50"
+              className={`py-1 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 
+                flex items-center gap-1 text-sm disabled:opacity-50 ${isMobile ? "w-full justify-center mt-2" : ""}`}
             >
               {isProcessing ? (
                 <>
@@ -234,6 +280,9 @@ export default function PostImageCard({
             </button>
           </div>
         </div>
+
+        {/* Post title moved below controls */}
+        <h3 className="font-bold text-lg mt-3 border-t-2 border-black/20 pt-3">{postTitle}</h3>
       </div>
 
       <div className="p-4">
@@ -242,13 +291,15 @@ export default function PostImageCard({
         {isProcessing ? (
           <div className="h-64 flex flex-col items-center justify-center bg-gray-50 border-2 border-gray-300 border-dashed rounded-lg">
             <Loader2 size={32} className="animate-spin text-black mb-2" />
-            <span className="font-medium">
+            <span className="font-medium text-center px-4">
               Generating {numImages} {IMAGE_STYLES.find((style) => style.value === imageStyle)?.label || "Realistic"}{" "}
               style image
               {numImages > 1 ? "s" : ""} using{" "}
               {IMAGE_SERVICES.find((service) => service.value === imageService)?.label || "Flux"}...
             </span>
-            {isPolling && <p className="text-sm text-gray-500 mt-2">This may take a minute. Please wait...</p>}
+            {isPolling && (
+              <p className="text-sm text-gray-500 mt-2 text-center px-4">This may take a minute. Please wait...</p>
+            )}
           </div>
         ) : hasError ? (
           <div className="h-64 flex flex-col items-center justify-center bg-red-50 border-2 border-red-300 border-dashed rounded-lg p-4">
