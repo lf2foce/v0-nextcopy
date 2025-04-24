@@ -13,16 +13,16 @@ export interface PostImage {
   }
 }
 
-// Helper function to check if an image URL is valid
+// Update the isValidImageUrl function to be more strict about rejecting blob URLs
 export function isValidImageUrl(url: string | undefined): boolean {
   if (!url) return false
 
-  // Check for common image formats or placeholder
-  // Avoid blob URLs as they can cause issues in some environments
+  // Explicitly reject blob URLs
   if (url.startsWith("blob:")) {
     return false
   }
 
+  // Only accept http/https URLs, data URLs, or local paths
   return url.startsWith("http") || url.startsWith("/") || url.startsWith("data:image/")
 }
 

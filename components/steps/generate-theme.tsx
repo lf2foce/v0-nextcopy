@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import type { Campaign, Theme } from "../campaign-workflow"
-import { Loader2, RefreshCw } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { generateThemes } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
 
@@ -12,70 +12,16 @@ interface GenerateThemeProps {
   onBack: () => void
 }
 
-// Theme ideas for different types of campaigns
-const themeIdeas = [
-  {
-    name: "Bold & Vibrant",
-    description: "High contrast colors with bold typography for maximum impact",
-  },
-  {
-    name: "Minimalist",
-    description: "Clean, simple designs with plenty of white space",
-  },
-  {
-    name: "Retro Wave",
-    description: "80s inspired neon colors and geometric patterns",
-  },
-  {
-    name: "Nature Inspired",
-    description: "Organic shapes and earthy color palette",
-  },
-  {
-    name: "Elegant & Sophisticated",
-    description: "Refined aesthetics with luxury appeal and subtle details",
-  },
-  {
-    name: "Playful & Fun",
-    description: "Whimsical elements with bright colors and casual typography",
-  },
-  {
-    name: "Tech & Modern",
-    description: "Sleek, futuristic design with cutting-edge aesthetics",
-  },
-  {
-    name: "Vintage Charm",
-    description: "Classic elements with a nostalgic feel and timeless appeal",
-  },
-  {
-    name: "Urban Street",
-    description: "Gritty textures with bold graphics and contemporary edge",
-  },
-  {
-    name: "Handcrafted",
-    description: "Artisanal feel with hand-drawn elements and organic textures",
-  },
-]
+// Remove the theme ideas array - we don't want fallbacks anymore
+// Removing: const themeIdeas = [...]
 
-// Function to generate random themes based on campaign details
-const generateRandomThemes = (campaign: Campaign, count = 4): Theme[] => {
-  // Shuffle the theme ideas array
-  const shuffled = [...themeIdeas].sort(() => 0.5 - Math.random())
-
-  // Take the first 'count' items
-  const selectedThemes = shuffled.slice(0, count)
-
-  // Map to Theme type with campaign ID
-  return selectedThemes.map((theme, index) => ({
-    id: `mock-${Date.now()}-${index}`,
-    name: theme.name,
-    description: theme.description,
-    campaignId: campaign.id,
-  }))
-}
+// Remove the generateRandomThemes function - no more fallbacks
+// Removing: const generateRandomThemes = (campaign: Campaign, count = 4): Theme[] => {...}
 
 export default function GenerateTheme({ campaign, onGenerate, onBack }: GenerateThemeProps) {
   const [isGenerating, setIsGenerating] = useState(false)
-  const [mockThemes, setMockThemes] = useState<Theme[]>([])
+  // Remove mockThemes state since we're not using fallbacks anymore
+  // const [mockThemes, setMockThemes] = useState<Theme[]>([])
   const { toast } = useToast()
 
   // Add fallback for missing campaign ID
@@ -90,12 +36,8 @@ export default function GenerateTheme({ campaign, onGenerate, onBack }: Generate
     }
   }, [campaign, toast])
 
-  // Generate initial mock themes when component mounts
-  useEffect(() => {
-    if (campaign && campaign.id) {
-      setMockThemes(generateRandomThemes(campaign))
-    }
-  }, [campaign])
+  // Remove the effect that generates initial mock themes
+  // Removing: useEffect(() => { if (campaign && campaign.id) { setMockThemes(generateRandomThemes(campaign)) } }, [campaign])
 
   const handleGenerate = async () => {
     console.log("Campaign received in GenerateTheme:", campaign)
@@ -113,13 +55,11 @@ export default function GenerateTheme({ campaign, onGenerate, onBack }: Generate
     setIsGenerating(true)
 
     try {
-      // Use the mock themes we've generated
-      const themesWithCampaignId = mockThemes.map((theme) => ({
-        ...theme,
-        campaignId: campaign.id,
-      }))
+      // Remove the mock themes logic and directly call the API
+      // Removing: const themesWithCampaignId = mockThemes.map((theme) => ({...theme, campaignId: campaign.id}))
 
-      const result = await generateThemes(campaign.id, themesWithCampaignId)
+      // Call the API directly without any fallback data
+      const result = await generateThemes(campaign.id)
 
       if (result.success) {
         toast({
@@ -146,17 +86,8 @@ export default function GenerateTheme({ campaign, onGenerate, onBack }: Generate
     }
   }
 
-  // Function to generate new mock themes
-  const handleRefreshThemes = () => {
-    if (campaign && campaign.id) {
-      const newThemes = generateRandomThemes(campaign)
-      setMockThemes(newThemes)
-      toast({
-        title: "New themes generated",
-        description: "Choose from these new theme options.",
-      })
-    }
-  }
+  // Remove the handleRefreshThemes function since we're not using mock themes
+  // Removing: const handleRefreshThemes = () => {...}
 
   return (
     <div className="space-y-6">
@@ -198,28 +129,8 @@ export default function GenerateTheme({ campaign, onGenerate, onBack }: Generate
         </div>
       </div>
 
-      {/* Preview of themes that will be generated */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="font-bold text-lg">Theme Preview</h3>
-          <button
-            onClick={handleRefreshThemes}
-            className="flex items-center gap-2 py-2 px-4 bg-gray-200 border-2 border-black rounded-md hover:bg-gray-300"
-          >
-            <RefreshCw size={16} />
-            Generate New Options
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {mockThemes.map((theme, index) => (
-            <div key={index} className="border-2 border-black rounded-md p-4 bg-white">
-              <h4 className="font-bold">{theme.name}</h4>
-              <p className="text-gray-700">{theme.description}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Remove the theme preview section since we're not using mock themes */}
+      {/* Removing: <div className="space-y-4">...</div> */}
 
       <div className="flex gap-4">
         <button

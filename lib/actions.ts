@@ -1,11 +1,9 @@
 "use server"
 
-import { db } from "./db"
+import { db, executeWithRetry } from "./db"
 import { themes, contentPosts, campaigns } from "./schema"
 import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
-
-// Add the createCampaign function after the imports and before the other functions
 
 // Create a new campaign
 export async function createCampaign(formData: any) {
@@ -25,8 +23,8 @@ export async function createCampaign(formData: any) {
       isActive: true,
     }
 
-    // Insert the new campaign into the database
-    const [newCampaign] = await db.insert(campaigns).values(campaignData).returning()
+    // Insert the new campaign into the database with retry logic
+    const [newCampaign] = await executeWithRetry(() => db.insert(campaigns).values(campaignData).returning())
 
     console.log("Campaign created successfully:", newCampaign)
     revalidatePath("/campaigns")
@@ -173,31 +171,31 @@ export async function completeReview(campaignId: number) {
   }
 }
 
-// Get campaign
+// Enhance getCampaign to include retry logic internally
 export async function getCampaign(campaignId: number) {
   try {
     console.log(`Getting campaign with id: ${campaignId}`)
 
-    // Fetch the campaign and related data
-    const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaignId))
+    // Use Promise.all with retry logic to fetch all data in parallel
+    const [campaign, allThemes, allPosts] = await executeWithRetry(() =>
+      Promise.all([
+        db
+          .select()
+          .from(campaigns)
+          .where(eq(campaigns.id, campaignId))
+          .then((res) => res[0]),
+        db.select().from(themes).where(eq(themes.campaignId, campaignId)),
+        db.select().from(contentPosts).where(eq(contentPosts.campaignId, campaignId)),
+      ]),
+    )
 
     if (!campaign) {
       return { success: false, error: "Campaign not found" }
     }
 
-    // Fetch all themes for this campaign
-    const allThemes = await db.select().from(themes).where(eq(themes.campaignId, campaignId))
-
-    // Fetch the selected theme
+    // Process data after fetching
     const selectedTheme = allThemes.find((theme) => theme.isSelected)
-
-    // Fetch all posts for this campaign
-    const allPosts = await db.select().from(contentPosts).where(eq(contentPosts.campaignId, campaignId))
-
-    // Filter approved posts
     const approvedPosts = allPosts.filter((post) => post.status === "approved")
-
-    // Filter posts with images
     const postsWithImages = allPosts.filter((post) => post.imageUrl)
 
     return {
@@ -213,7 +211,10 @@ export async function getCampaign(campaignId: number) {
     }
   } catch (error) {
     console.error("Failed to get campaign:", error)
-    return { success: false, error: "Failed to get campaign" }
+    return {
+      success: false,
+      error: "Failed to get campaign: " + (error instanceof Error ? error.message : String(error)),
+    }
   }
 }
 
@@ -233,12 +234,29 @@ export async function toggleCampaignActiveStatus(campaignId: number, isActive: b
   }
 }
 
-// Get campaign with step
+// Enhance getCampaignWithStep to include retry logic internally
 export async function getCampaignWithStep(campaignId: number) {
   try {
     console.log(`Getting campaign with id: ${campaignId}`)
 
-    const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaignId))
+    // Use a more efficient query with retry logic
+    const [campaign] = await executeWithRetry(() =>
+      db
+        .select({
+          id: campaigns.id,
+          title: campaigns.title,
+          description: campaigns.description,
+          currentStep: campaigns.currentStep,
+          status: campaigns.status,
+          isActive: campaigns.isActive,
+          targetCustomer: campaigns.targetCustomer,
+          insight: campaigns.insight,
+          repeatEveryDays: campaigns.repeatEveryDays,
+          startDate: campaigns.startDate,
+        })
+        .from(campaigns)
+        .where(eq(campaigns.id, campaignId)),
+    )
 
     if (!campaign) {
       return { success: false, error: "Campaign not found" }
@@ -247,14 +265,45 @@ export async function getCampaignWithStep(campaignId: number) {
     return { success: true, data: campaign }
   } catch (error) {
     console.error("Failed to get campaign:", error)
-    return { success: false, error: "Failed to get campaign" }
+    return {
+      success: false,
+      error: "Failed to get campaign: " + (error instanceof Error ? error.message : String(error)),
+    }
   }
 }
 
-export async function generateThemes() {
-  return {
-    success: false,
-    error: "generateThemes is not implemented",
+// Update the generateThemes function to remove any fallbacks
+export async function generateThemes(campaignId: number) {
+  try {
+    // Call the API directly without any fallbacks
+    const response = await fetch(`/api/themes/generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ campaignId }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to generate themes: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+
+    if (!data.success) {
+      throw new Error(data.error || "API returned unsuccessful response")
+    }
+
+    return {
+      success: true,
+      data: data.themes || data.data,
+    }
+  } catch (error) {
+    console.error("Failed to generate themes:", error)
+    return {
+      success: false,
+      error: "Failed to generate themes: " + (error instanceof Error ? error.message : String(error)),
+    }
   }
 }
 

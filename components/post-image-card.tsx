@@ -304,12 +304,10 @@ export default function PostImageCard({
                       image.isSelected && !hasError ? "border-green-500" : "border-black"
                     } rounded-md overflow-hidden h-40 cursor-pointer ${hasError ? "cursor-not-allowed" : ""}`}
                   >
-                    {hasError ? (
+                    {isBlobUrl ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100">
                         <ImageIcon size={32} className="text-gray-400 mb-2" />
-                        <span className="text-xs text-gray-500 text-center px-2">
-                          {isBlobUrl ? "Blob URL not supported" : "Image unavailable"}
-                        </span>
+                        <span className="text-xs text-gray-500 text-center px-2">Blob URL not supported</span>
                       </div>
                     ) : (
                       <div className="relative w-full h-full">

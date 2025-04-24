@@ -6,19 +6,31 @@ import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { desc } from "drizzle-orm"
 
-// Update the getSiteUrl function to handle both client and server environments better
+// Replace the existing getSiteUrl function with this improved version
 function getSiteUrl(): string {
   // Check if we're in a browser environment
   if (typeof window !== "undefined") {
     return window.location.origin
   }
 
-  // Server-side: use environment variable with fallback
-  const url =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
+  // Server-side: check all possible environment variables in order of preference
+  // First check the explicitly set public URLs
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL
+  }
 
-  return url
+  if (process.env.NEXT_PUBLIC_URL) {
+    return process.env.NEXT_PUBLIC_URL
+  }
+
+  // Then check Vercel deployment URL
+  if (process.env.VERCEL_URL) {
+    // Ensure it has https:// prefix
+    return `https://${process.env.VERCEL_URL}`
+  }
+
+  // Final fallback for local development
+  return "http://localhost:3000"
 }
 
 // Define types for CampaignType and ThemeType

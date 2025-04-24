@@ -125,7 +125,9 @@ export function MultipleImagesDisplay({
         {imagesToDisplay.length > 0 && (
           <div className="flex overflow-x-auto gap-3 pb-2 snap-x">
             {imagesToDisplay.map((image, index) => {
-              const hasError = imageErrors[index] || !isValidImageUrl(image.url)
+              // Add explicit check for blob URLs in the image rendering
+              const isBlobUrl = image.url?.startsWith("blob:")
+              const hasError = imageErrors[index] || isBlobUrl || !isValidImageUrl(image.url)
 
               return (
                 <div
@@ -136,7 +138,9 @@ export function MultipleImagesDisplay({
                 >
                   {hasError ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 border-2 border-gray-300 rounded-lg">
-                      <span className="text-xs text-gray-500 text-center px-2">Image unavailable</span>
+                      <span className="text-xs text-gray-500 text-center px-2">
+                        {isBlobUrl ? "Blob URL not supported" : "Image unavailable"}
+                      </span>
                     </div>
                   ) : (
                     <>
@@ -204,7 +208,9 @@ export function MultipleImagesDisplay({
       {imagesToDisplay.length > 1 && (
         <div className="grid grid-cols-4 gap-2">
           {imagesToDisplay.map((image, index) => {
-            const hasError = imageErrors[index] || !isValidImageUrl(image.url)
+            // Add explicit check for blob URLs in the image rendering
+            const isBlobUrl = image.url?.startsWith("blob:")
+            const hasError = imageErrors[index] || isBlobUrl || !isValidImageUrl(image.url)
 
             return (
               <button
@@ -224,7 +230,7 @@ export function MultipleImagesDisplay({
               >
                 {hasError ? (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100">
-                    <span className="text-xs text-gray-500">Error</span>
+                    <span className="text-xs text-gray-500">{isBlobUrl ? "Blob URL not supported" : "Error"}</span>
                   </div>
                 ) : (
                   <Image
