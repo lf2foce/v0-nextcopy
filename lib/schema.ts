@@ -53,7 +53,7 @@ export const contentPosts = pgTable("content_posts", {
   feedback: text("feedback"),
   imageUrl: text("image_url"),
   videoUrl: text("video_url"), // Added video_url field
-  images: text("images"), // Stores a flat JSON array of image objects
+  images: text("images"), // This will store JSON string of multiple images
   defaultImageIndex: integer("default_image_index").default(0), // Index of the default image
   image_status: text("image_status").default("pending"), // Add image_status field with default "pending"
 })

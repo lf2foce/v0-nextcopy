@@ -12,9 +12,13 @@ export async function POST(request: NextRequest) {
 
     // Call the external API
     try {
-      const fastApiUrl = process.env.FASTAPI_URL || "http://nextcopy-backend-test.onrender.com"
-      console.log(`Connecting to FastAPI backend at: ${fastApiUrl}`)
-      
+      const fastApiUrl = process.env.FASTAPI_URL
+      if (!fastApiUrl) {
+        return NextResponse.json(
+          { success: false, error: "FASTAPI_URL environment variable is not set" },
+          { status: 500 },
+        )
+      }
       const response = await fetch(`${fastApiUrl}/themes/${themeId}/select`, {
         method: "POST",
         headers: {

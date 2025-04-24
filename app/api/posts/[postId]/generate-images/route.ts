@@ -12,8 +12,11 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
     const searchParams = request.nextUrl.searchParams
     const numImages = searchParams.get("num_images") || "1"
     const imageStyle = searchParams.get("style") || "realistic"
+    const imageService = searchParams.get("image_service") || "flux" // Add image service parameter with default
 
-    console.log(`API route: Generating ${numImages} images with style "${imageStyle}" for post ${postId}`)
+    console.log(
+      `API route: Generating ${numImages} images with style "${imageStyle}" using service "${imageService}" for post ${postId}`,
+    )
 
     // Call the FastAPI backend
     const fastApiUrl = process.env.FASTAPI_URL
@@ -25,7 +28,7 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
     }
 
     // Log the URL we're calling for debugging
-    const endpoint = `${fastApiUrl}/content/${postId}/generate_images_real?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}`
+    const endpoint = `${fastApiUrl}/content/${postId}/generate_images_real?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}&image_service=${encodeURIComponent(imageService)}`
     console.log(`Calling FastAPI endpoint: ${endpoint}`)
 
     try {
@@ -148,22 +151,6 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
       }
     } catch (fetchError) {
       console.error("Network error when calling FastAPI:", fetchError)
-      
-      // Special handling for timeout errors
-      const isTimeout = 
-        (fetchError instanceof Error && fetchError.name === 'AbortError') ||
-        (fetchError instanceof Error && fetchError.message?.includes('timeout'));
-        
-      if (isTimeout) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "The backend service is taking too long to respond. This might be due to a cold start. Please try again.",
-          },
-          { status: 503 }
-        );
-      }
-      
       return NextResponse.json(
         {
           success: false,

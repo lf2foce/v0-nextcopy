@@ -15,7 +15,8 @@ import {
   RefreshCw,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { getCampaign, postToSocialMedia } from "@/lib/actions"
+import { getCampaign } from "@/lib/actions"
+import { postToSocialMedia } from "@/lib/actions_api" // Updated import
 import PostModal from "@/components/ui/post-modal"
 import { useToast } from "@/hooks/use-toast"
 import { MultipleImagesDisplay } from "@/components/multiple-images-display"

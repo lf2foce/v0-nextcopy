@@ -13,7 +13,7 @@ import {
   Repeat,
   PauseCircle,
 } from "lucide-react"
-import { getAllCampaigns } from "@/lib/actions"
+import { getAllCampaigns } from "@/lib/actions_api" // Changed from @/lib/actions to @/lib/actions_api
 import RefreshButton from "@/components/refresh-button"
 
 export default function CampaignsPage() {
@@ -257,6 +257,14 @@ export default function CampaignsPage() {
                       <Link
                         href={`/campaigns/${campaign.id}/edit`}
                         className="flex-1 flex items-center justify-center gap-1 py-2 px-2 sm:px-4 bg-green-400 border-2 border-black rounded-md font-medium hover:bg-green-500 text-sm"
+                        prefetch={true}
+                        onClick={(e) => {
+                          // Prevent default behavior on mobile to handle navigation manually
+                          if (window.innerWidth < 768) {
+                            e.preventDefault()
+                            window.location.href = `/campaigns/${campaign.id}/edit`
+                          }
+                        }}
                       >
                         <ArrowRight size={16} className="flex-shrink-0" />
                         <span>Continue Setup</span>

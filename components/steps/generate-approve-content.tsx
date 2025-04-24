@@ -4,42 +4,9 @@ import { useState, useEffect } from "react"
 import type { Campaign, Theme, Post } from "../campaign-workflow"
 import { CheckIcon, RefreshCw, Eye, Loader2 } from "lucide-react"
 import PostModal from "../ui/post-modal"
-import {
-  approvePosts,
-  updatePostContent,
-  fetchPostsForTheme,
-  triggerBackendPostGeneration,
-  checkThemePostStatus,
-} from "@/lib/actions"
+import { approvePosts, fetchPostsForTheme } from "@/lib/actions"
+import { checkThemePostStatus } from "@/lib/actions_api" // Updated import
 import { useToast } from "@/hooks/use-toast"
-
-// Helper function to generate random post content
-const generateRandomPostContent = () => {
-  const intros = [
-    "Check out our latest collection!",
-    "Introducing our newest products!",
-    "You won't believe what we just launched!",
-    "The wait is over - it's finally here!",
-    "Elevate your experience with our new release!",
-  ]
-
-  const descriptions = [
-    "Perfect for those who appreciate quality and style.",
-    "Designed with you in mind, for every occasion.",
-    "Crafted with premium materials for lasting performance.",
-    "The ultimate combination of form and function.",
-    "Setting new standards in design and innovation.",
-  ]
-
-  const hashtags = ["#NewRelease", "#MustHave", "#LimitedEdition", "#TrendAlert", "#ExclusiveOffer"]
-
-  const randomIntro = intros[Math.floor(Math.random() * intros.length)]
-  const randomDesc = descriptions[Math.floor(Math.random() * descriptions.length)]
-  const randomHashtag1 = hashtags[Math.floor(Math.random() * hashtags.length)]
-  const randomHashtag2 = hashtags[Math.floor(Math.random() * hashtags.length)]
-
-  return `${randomIntro} ${randomDesc} ${randomHashtag1} ${randomHashtag2}`
-}
 
 interface GenerateApproveContentProps {
   campaign: Campaign
@@ -63,15 +30,14 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
   const [pollingAttempts, setPollingAttempts] = useState(0)
   const MAX_POLLING_ATTEMPTS = 30 // About 1 minute with 2-second intervals
 
-  // Add this useEffect to start polling when the component mounts
+  // Start polling when the component mounts
   useEffect(() => {
     if (campaign && theme && typeof theme.id === "number") {
-      // Start polling for content when component mounts
       startPollingForContent(theme.id)
     }
   }, [campaign, theme])
 
-  // Add this function to poll for content
+  // Function to poll for content
   const startPollingForContent = async (themeId: number) => {
     if (!themeId) return
 
@@ -131,15 +97,7 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
     }
   }
 
-  // Replace the current useEffect that generates posts with this:
-  useEffect(() => {
-    if (campaign && theme && theme.id) {
-      // Instead of generating posts, fetch existing posts for this theme
-      fetchExistingPosts()
-    }
-  }, [campaign, theme])
-
-  // Add this function to fetch existing posts
+  // Function to fetch existing posts
   const fetchExistingPosts = async () => {
     if (!campaign.id || typeof theme.id !== "number") {
       toast({
@@ -198,76 +156,6 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
       setSelectedPostIds(allPostIds)
     }
   }, [posts])
-
-  const handleGeneratePosts = async () => {
-    if (!campaign.id || typeof theme.id !== "number") {
-      toast({
-        title: "Error",
-        description: "Campaign or theme ID is missing",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsGenerating(true)
-
-    try {
-      // Instead of generating posts locally, trigger the backend to generate posts
-      // This would be a new server action that calls your backend API
-      const result = await triggerBackendPostGeneration(campaign.id, theme.id)
-
-      if (result.success) {
-        console.log("Backend generated posts successfully. Count:", result.data.length)
-        setPosts(result.data)
-        toast({
-          title: "Posts generated",
-          description: "Your posts have been generated successfully.",
-        })
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to generate posts",
-          variant: "destructive",
-        })
-        setPosts([])
-      }
-    } catch (error) {
-      console.error("Error generating posts:", error)
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
-      })
-      setPosts([])
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
-  const handleRegeneratePosts = async () => {
-    // Reset selection when regenerating
-    setSelectedPostIds(new Set())
-    setIsGenerating(true)
-
-    // Clear existing posts first
-    setPosts([])
-
-    try {
-      // Restart the polling process
-      if (typeof theme.id === "number") {
-        startPollingForContent(theme.id)
-      }
-    } catch (error) {
-      console.error("Error regenerating posts:", error)
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
-      })
-    } finally {
-      setIsGenerating(false)
-    }
-  }
 
   const handleTogglePost = (postId: string | number) => {
     const newSelectedPostIds = new Set(selectedPostIds)
@@ -351,39 +239,43 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
     setRegeneratingPostId(postId)
 
     try {
-      // Generate new content
-      const newContent = generateRandomPostContent()
-
       // Update the post in the database if it has a numeric ID
       if (typeof postId === "number") {
-        const result = await updatePostContent(postId, newContent)
+        // Call the API to regenerate the post content
+        const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/posts/${postId}/regenerate-content`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
 
-        if (!result.success) {
+        if (!response.ok) {
+          throw new Error(`Failed to regenerate post: ${response.status} ${response.statusText}`)
+        }
+
+        const result = await response.json()
+
+        if (result.success && result.data) {
+          // Update the post in the local state
+          setPosts((prevPosts) =>
+            prevPosts.map((post) =>
+              post.id === postId
+                ? {
+                    ...post,
+                    content: result.data.content,
+                  }
+                : post,
+            ),
+          )
+
           toast({
-            title: "Warning",
-            description: "Post regenerated but not saved to database",
-            variant: "destructive",
+            title: "Post regenerated",
+            description: "The post content has been regenerated successfully.",
           })
+        } else {
+          throw new Error(result.error || "Failed to regenerate post content")
         }
       }
-
-      // Update the local posts array with the regenerated post
-      setPosts((prevPosts) =>
-        prevPosts.map((post) =>
-          post.id === postId
-            ? {
-                ...post,
-                content: newContent,
-                image: `/placeholder.svg?height=400&width=400&text=Regenerated_${postId}`,
-              }
-            : post,
-        ),
-      )
-
-      toast({
-        title: "Post regenerated",
-        description: "The post content has been regenerated successfully.",
-      })
     } catch (error) {
       console.error("Error regenerating post:", error)
       toast({
@@ -400,8 +292,6 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
   const themeName = theme.title || theme.name || "Theme"
   const themeDescription = theme.story || theme.description || ""
 
-  // Update the JSX to show a loading state while polling
-  // Replace the existing posts.length === 0 condition with this:
   return (
     <div className="space-y-6">
       <div>
@@ -428,7 +318,7 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
             <>
               <p className="text-lg font-medium mb-4">No content has been generated yet</p>
               <button
-                onClick={handleGeneratePosts}
+                onClick={fetchExistingPosts}
                 className="py-3 px-6 bg-green-400 border-4 border-black rounded-md font-bold text-lg hover:bg-green-500 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
               >
                 Generate Content
@@ -437,23 +327,13 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
           )}
         </div>
       ) : (
-        // Existing code for when posts are available
         <>
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center">
               <h3 className="text-xl font-bold">Campaign Posts</h3>
             </div>
-            <button
-              onClick={handleRegeneratePosts}
-              disabled={isGenerating}
-              className="py-2 px-4 bg-purple-400 border-2 border-black rounded-md font-medium hover:bg-purple-500 flex items-center gap-2"
-            >
-              {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-              Regenerate All
-            </button>
           </div>
 
-          {/* Rest of the existing code for displaying posts */}
           <div className="flex justify-between items-center mb-2">
             <div className="text-sm">
               <span className="font-bold">{selectedPostIds.size}</span> of{" "}

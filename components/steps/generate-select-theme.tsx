@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import type { Campaign, Theme } from "../campaign-workflow"
 import { Loader2, RefreshCw } from "lucide-react"
-import { generateThemes, selectTheme } from "@/lib/actions"
+import { generateThemes, selectTheme } from "@/lib/actions_api" // Updated import
 import { useToast } from "@/hooks/use-toast"
 
 interface GenerateSelectThemeProps {
@@ -19,14 +19,14 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
   const [selectedThemeId, setSelectedThemeId] = useState<string | number | null>(null)
   const { toast } = useToast()
 
-  // Generate and save themes when component mounts
+  // Generate themes when component mounts
   useEffect(() => {
     if (campaign && campaign.id) {
       generateAndSaveThemes()
     }
   }, [campaign])
 
-  // Function to generate and save themes
+  // Function to generate themes
   const generateAndSaveThemes = async () => {
     if (!campaign.id) {
       toast({
@@ -46,7 +46,6 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
 
       if (result.success) {
         console.log("Themes generated successfully. Count:", result.data.length)
-        // Completely replace existing themes
         setThemes(result.data)
 
         if (result.warning) {
@@ -61,7 +60,6 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
           description: result.error || "Failed to generate themes",
           variant: "destructive",
         })
-        // Set empty themes array if API fails
         setThemes([])
       }
     } catch (error) {
@@ -71,21 +69,10 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
         description: "An unexpected error occurred",
         variant: "destructive",
       })
-      // Set empty themes array if there's an error
       setThemes([])
     } finally {
       setIsLoading(false)
     }
-  }
-
-  // Function to refresh themes - completely replace existing themes
-  const handleRefreshThemes = async () => {
-    setThemes([]) // Clear existing themes first
-    await generateAndSaveThemes()
-    toast({
-      title: "Themes refreshed",
-      description: "New theme options have been generated.",
-    })
   }
 
   // Function to handle theme selection
@@ -93,7 +80,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
     setSelectedThemeId(themeId)
   }
 
-  // Function to handle theme selection and start polling
+  // Function to handle theme selection and continue
   const handleContinue = async () => {
     if (!selectedThemeId) {
       toast({
@@ -137,7 +124,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
         })
       }
 
-      // Immediately move to the next step without polling
+      // Move to the next step
       onThemeSelected(selectedTheme)
     } catch (error) {
       console.error("Theme selection error:", error)
@@ -186,7 +173,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
         <>
           <div className="flex justify-end">
             <button
-              onClick={handleRefreshThemes}
+              onClick={generateAndSaveThemes}
               disabled={isSelecting}
               className="py-2 px-4 bg-gray-200 border-2 border-black rounded-md font-medium hover:bg-gray-300 flex items-center gap-2"
             >

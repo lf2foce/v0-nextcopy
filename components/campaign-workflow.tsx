@@ -10,9 +10,7 @@ import ReviewPosts from "./steps/review-posts"
 import CompletionStep from "./steps/completion-step"
 import WorkflowProgress from "./workflow-progress"
 import { useToast } from "@/hooks/use-toast"
-import { updateCampaignStep } from "@/lib/actions"
-import { getCampaignSteps } from "@/lib/campaign-steps"
-// First, add the import for the new component
+import { updateCampaignStep, getCampaignSteps } from "@/lib/actions_api"
 import GenerateMultipleImages from "./steps/generate-multiple-images"
 
 // Update the Campaign type to match the new schema
@@ -217,8 +215,8 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
     // Update to step 7 (Completion) when review is complete
     if (campaign?.id) {
       try {
-        const CAMPAIGN_STEPS = await getCampaignSteps()
-        await updateCampaignStep(campaign.id, CAMPAIGN_STEPS.COMPLETION) // Now using 7 instead of 8
+        const steps = await getCampaignSteps()
+        await updateCampaignStep(campaign.id, steps.COMPLETION) // Now using 7 instead of 8
       } catch (error) {
         console.error("Failed to update campaign step:", error)
       }

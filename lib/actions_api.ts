@@ -1,106 +1,92 @@
 "use server"
+
 import { db } from "./db"
-import { themes, contentPosts } from "./schema"
+import { themes, contentPosts, campaigns } from "./schema"
 import { eq } from "drizzle-orm"
-import { updateCampaignStep, getCampaignSteps } from "./actions"
-import type { Theme as ThemeType } from "../components/campaign-workflow"
-import type { Campaign as CampaignType } from "../components/campaign-workflow"
-import type { NewTheme } from "./schema"
+import { revalidatePath } from "next/cache"
+import { desc } from "drizzle-orm"
 
-// Theme ideas for different types of campaigns - kept for mock generation
-const themeIdeas = [
-  {
-    name: "Bold & Vibrant",
-    description: "High contrast colors with bold typography for maximum impact",
-  },
-  {
-    name: "Minimalist",
-    description: "Clean, simple designs with plenty of white space",
-  },
-  {
-    name: "Retro Wave",
-    description: "80s inspired neon colors and geometric patterns",
-  },
-  {
-    name: "Nature Inspired",
-    description: "Organic shapes and earthy color palette",
-  },
-  {
-    name: "Elegant & Sophisticated",
-    description: "Refined aesthetics with luxury appeal and subtle details",
-  },
-  {
-    name: "Playful & Fun",
-    description: "Whimsical elements with bright colors and casual typography",
-  },
-  {
-    name: "Tech & Modern",
-    description: "Sleek, futuristic design with cutting-edge aesthetics",
-  },
-  {
-    name: "Vintage Charm",
-    description: "Classic elements with a nostalgic feel and timeless appeal",
-  },
-  {
-    name: "Urban Street",
-    description: "Gritty textures with bold graphics and contemporary edge",
-  },
-  {
-    name: "Handcrafted",
-    description: "Artisanal feel with hand-drawn elements and organic textures",
-  },
-]
-
-// Function to generate random themes based on campaign details - kept for testing
-const generateRandomThemes = (campaign: CampaignType, count = 4): ThemeType[] => {
-  // Shuffle the theme ideas array
-  const shuffled = [...themeIdeas].sort(() => 0.5 - Math.random())
-
-  // Take the first 'count' items
-  const selectedThemes = shuffled.slice(0, count)
-
-  // Map to Theme type with campaign ID
-  return selectedThemes.map((theme, index) => ({
-    id: `mock-${Date.now()}-${index}`,
-    name: theme.name,
-    description: theme.description,
-    campaignId: campaign.id,
-  }))
+// Define types for CampaignType and ThemeType
+type CampaignType = {
+  id: number
+  name: string
+  description: string
 }
 
-// Generate themes for a campaign - updated to use external API
-export async function generateThemes(campaignId: number, themesData?: ThemeType[], useMock = false) {
+type ThemeType = {
+  id: string
+  name: string
+  description: string
+  campaignId: number
+}
+
+// Define step constants for clarity - moved from actions.ts to avoid circular dependencies
+// Convert this to an async function that returns the constants
+export async function getCampaignSteps() {
+  return {
+    NEW: 0,
+    GENERATE_THEME: 2, // Both theme steps combined as 2
+    SELECT_THEME: 2, // Both theme steps combined as 2
+    GENERATE_POST: 3, // Both post steps combined as 3
+    APPROVE_POST: 3, // Both post steps combined as 3
+    GENERATE_IMAGES: 4, // Updated from 5 to 4
+    GENERATE_VIDEO: 5, // Updated from 6 to 5
+    REVIEW: 6, // Updated from 7 to 6
+    COMPLETION: 7, // Updated from 8 to 7
+    SCHEDULED: 8, // Updated from 9 to 8
+  }
+}
+
+// Update campaign step - moved from actions.ts to avoid circular dependencies
+export async function updateCampaignStep(campaignId: number, step: number) {
+  try {
+    console.log(`Updating campaign ${campaignId} to step ${step}`)
+
+    // Update both currentStep and status if needed
+    let status = "draft"
+    if (step === 8) {
+      // Use hardcoded value instead of CAMPAIGN_STEPS.SCHEDULED
+      status = "active" // Only set to active when fully scheduled (step 8)
+    }
+
+    const [updatedCampaign] = await db
+      .update(campaigns)
+      .set({
+        currentStep: step,
+        status: status,
+      })
+      .where(eq(campaigns.id, campaignId))
+      .returning()
+
+    // Revalidate both the campaigns list and the specific campaign page
+    revalidatePath("/campaigns")
+    revalidatePath(`/campaigns/${campaignId}`)
+
+    return { success: true, data: updatedCampaign }
+  } catch (error) {
+    console.error("Failed to update campaign step:", error)
+    return {
+      success: false,
+      error: "Failed to update campaign step: " + (error instanceof Error ? error.message : String(error)),
+    }
+  }
+}
+
+// Generate themes for a campaign
+export async function generateThemes(campaignId: number) {
   console.log("Server action: generateThemes called with campaignId:", campaignId)
 
   try {
-    // If useMock is true or themesData is provided, use the mock generation
-    if (useMock || themesData) {
-      console.log("Using mock theme generation")
-
-      // First, delete all existing themes for this campaign
-      await db.delete(themes).where(eq(themes.campaignId, campaignId))
-
-      const themesToInsert: NewTheme[] = (themesData || []).map((theme) => ({
-        campaignId,
-        title: theme.name,
-        story: theme.description,
-        isSelected: false,
-        status: "pending",
-      }))
-
-      console.log("Inserting themes:", themesToInsert)
-      const insertedThemes = await db.insert(themes).values(themesToInsert).returning()
-      console.log("Inserted themes:", insertedThemes)
-
-      // Update campaign step to Generate Theme (2) - no change needed here
-      const CAMPAIGN_STEPS = await getCampaignSteps()
-      await updateCampaignStep(campaignId, CAMPAIGN_STEPS.GENERATE_THEME)
-
-      return { success: true, data: insertedThemes }
-    }
-
     // Use the external API via our proxy endpoint
     console.log("Fetching themes from external API")
+
+    if (!process.env.FASTAPI_URL) {
+      return {
+        success: false,
+        error: "FASTAPI_URL environment variable is not set",
+      }
+    }
+
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/copy/themes/generate`, {
         method: "POST",
@@ -148,7 +134,7 @@ export async function generateThemes(campaignId: number, themesData?: ThemeType[
         await db.delete(themes).where(eq(themes.campaignId, campaignId))
 
         // Map API themes to our database schema
-        const themesToInsert: NewTheme[] = apiThemes.map((theme: any) => ({
+        const themesToInsert = apiThemes.map((theme: any) => ({
           campaignId,
           title: theme.name || theme.title,
           story: theme.description || theme.story,
@@ -162,8 +148,8 @@ export async function generateThemes(campaignId: number, themesData?: ThemeType[
         console.log("Inserted themes:", insertedThemes)
 
         // Update campaign step to Generate Theme (2)
-        const CAMPAIGN_STEPS = await getCampaignSteps()
-        await updateCampaignStep(campaignId, CAMPAIGN_STEPS.GENERATE_THEME)
+        const steps = await getCampaignSteps()
+        await updateCampaignStep(campaignId, steps.GENERATE_THEME)
 
         return { success: true, data: insertedThemes }
       } catch (parseError) {
@@ -193,7 +179,7 @@ export async function generateThemes(campaignId: number, themesData?: ThemeType[
   }
 }
 
-// Select a theme for a campaign - updated to rely solely on external API
+// Select a theme for a campaign
 export async function selectTheme(themeId: number) {
   try {
     console.log(`Selecting theme ${themeId} via external API`)
@@ -237,8 +223,8 @@ export async function selectTheme(themeId: number) {
 
     if (themeData) {
       const campaignId = themeData.campaignId
-      const CAMPAIGN_STEPS = await getCampaignSteps()
-      await updateCampaignStep(campaignId, CAMPAIGN_STEPS.GENERATE_POST)
+      const steps = await getCampaignSteps()
+      await updateCampaignStep(campaignId, steps.GENERATE_POST)
 
       // Update the theme status in our database to reflect the selection
       await db
@@ -264,7 +250,7 @@ export async function selectTheme(themeId: number) {
   }
 }
 
-// Function to check theme post status - FIXED to properly check post_status column
+// Function to check theme post status
 export async function checkThemePostStatus(themeId: number) {
   try {
     // Get the theme from the database
@@ -302,14 +288,21 @@ export async function checkThemePostStatus(themeId: number) {
   }
 }
 
-// Update the generateImagesForPost function to handle async generation and style
-export async function generateImagesForPost(postId: number, numImages = 1, imageStyle = "realistic") {
+// Update the generateImagesForPost function to include imageService parameter
+export async function generateImagesForPost(
+  postId: number,
+  numImages = 1,
+  imageStyle = "realistic",
+  imageService = "flux",
+) {
   try {
-    console.log(`Generating ${numImages} images with style "${imageStyle}" for post ${postId}`)
+    console.log(
+      `Generating ${numImages} images with style "${imageStyle}" using service "${imageService}" for post ${postId}`,
+    )
 
     // Call our API route that will call the FastAPI backend
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL}/api/posts/${postId}/generate-images?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/posts/${postId}/generate-images?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}&image_service=${encodeURIComponent(imageService)}`,
       {
         method: "POST",
         headers: {
@@ -404,7 +397,9 @@ export async function generateImagesForPost(postId: number, numImages = 1, image
   }
 }
 
-// Add this function to check image generation status for a post
+// Improve the checkImageGenerationStatus function to ensure it returns complete image data
+
+// Check image generation status for a post
 export async function checkImageGenerationStatus(postId: number) {
   try {
     console.log(`Checking image generation status for post ${postId}`)
@@ -425,17 +420,23 @@ export async function checkImageGenerationStatus(postId: number) {
       try {
         const imagesData = JSON.parse(post.images)
         images = imagesData.images?.images || imagesData.images || []
+
+        // Filter out placeholder images
+        images = images.filter((img: any) => !img.url?.includes("placeholder.svg"))
       } catch (e) {
         console.error("Error parsing images JSON:", e)
       }
     }
 
+    // Check if we have real images (not placeholders)
+    const hasRealImages = images.length > 0
+
     return {
       success: true,
       data: {
         status: post.image_status || "pending",
-        isComplete: post.image_status === "completed",
-        hasImages: images.length > 0,
+        isComplete: post.image_status === "completed" || hasRealImages,
+        hasImages: hasRealImages,
         images: images,
         imageUrl: post.imageUrl,
       },
@@ -445,6 +446,262 @@ export async function checkImageGenerationStatus(postId: number) {
     return {
       success: false,
       error: "Failed to check image status: " + (error instanceof Error ? error.message : String(error)),
+    }
+  }
+}
+
+// Post to social media
+export async function postToSocialMedia(postId: number, platform: string, content: string) {
+  try {
+    console.log(`Posting to ${platform} for post ID ${postId}`)
+
+    // Call the API route - note we're not using content parameter anymore
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/social/${platform}/post`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ postId }),
+    })
+
+    // Log the response status for debugging
+    console.log(`API response status: ${response.status} ${response.statusText}`)
+
+    // First check if the response is ok
+    if (!response.ok) {
+      // Try to parse as JSON, but handle text response if it's not valid JSON
+      try {
+        const errorData = await response.json()
+        console.error("Error response data:", errorData)
+        return {
+          success: false,
+          error: errorData.error || `Failed to post to ${platform}: ${response.status} ${response.statusText}`,
+        }
+      } catch (parseError) {
+        // If JSON parsing fails, get the response as text instead
+        try {
+          const errorText = await response.text()
+          console.error("Error response text:", errorText)
+          return {
+            success: false,
+            error: `Failed to post to ${platform}: ${errorText.substring(0, 100)}...`,
+          }
+        } catch (textError) {
+          // If even text extraction fails
+          return {
+            success: false,
+            error: `Failed to post to ${platform}: ${response.status} ${response.statusText}`,
+          }
+        }
+      }
+    }
+
+    // Try to parse the successful response as JSON
+    try {
+      const result = await response.json()
+      console.log("Success response:", result)
+
+      // Update the post status in our database if needed
+      // This would be a good place to update the post status to "posted"
+
+      return { success: true, data: result }
+    } catch (parseError) {
+      console.error("JSON parse error for successful response:", parseError)
+      // If JSON parsing fails for a successful response, still return success
+      return {
+        success: true,
+        data: { message: "Posted successfully, but response wasn't valid JSON" },
+      }
+    }
+  } catch (error) {
+    console.error(`Failed to post to ${platform}:`, error)
+    return {
+      success: false,
+      error: `Failed to post to ${platform}: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+}
+
+// Get all campaigns with status
+export async function getAllCampaigns() {
+  try {
+    // Use standard select instead of query builder
+    const allCampaigns = await db.select().from(campaigns).orderBy(desc(campaigns.id))
+
+    // Determine UI status based on database status and currentStep
+    const mappedCampaigns = allCampaigns.map(async (campaign) => {
+      // Map status for UI:
+      // - "scheduled" for campaigns at step 8 (fully scheduled)
+      // - "draft" for all other campaigns (in progress/incomplete)
+      const steps = await getCampaignSteps()
+      const uiStatus = campaign.currentStep === steps.SCHEDULED ? "scheduled" : "draft"
+
+      return {
+        ...campaign,
+        status: uiStatus,
+        // Make sure isActive is included (default to true if not set)
+        isActive: campaign.isActive !== undefined ? campaign.isActive : true,
+      }
+    })
+
+    const resolvedCampaigns = await Promise.all(mappedCampaigns)
+
+    return { success: true, data: resolvedCampaigns }
+  } catch (error) {
+    console.error("Failed to get campaigns:", error)
+    return {
+      success: false,
+      error: "Failed to get campaigns: " + (error instanceof Error ? error.message : String(error)),
+    }
+  }
+}
+
+// Add these new functions at the end of the file
+
+// Save image selection to database
+export async function saveImageSelection(postId: number, images: string, mainImageUrl: string) {
+  try {
+    const response = await fetch(`/api/posts/${postId}/update-images`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id: postId,
+        image: mainImageUrl,
+        imagesJson: images,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error("Failed to save image selection to database:", errorText)
+      return {
+        success: false,
+        error: `Failed to save selection: ${response.status} ${response.statusText}`,
+      }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error saving image selection to database:", error)
+    return {
+      success: false,
+      error: "Failed to save selection: " + (error instanceof Error ? error.message : String(error)),
+    }
+  }
+}
+
+// Clear images for a post
+export async function clearPostImages(postId: number, placeholderImages: any) {
+  try {
+    const response = await fetch(`/api/posts/${postId}/update-images`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id: postId,
+        image: "",
+        imagesJson: JSON.stringify({ images: placeholderImages }),
+      }),
+    })
+
+    if (!response.ok) {
+      return { success: false, error: `Failed to clear images: ${response.status}` }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error clearing images:", error)
+    return {
+      success: false,
+      error: "Failed to clear images: " + (error instanceof Error ? error.message : String(error)),
+    }
+  }
+}
+
+// Process image generation with error handling
+export async function processImageGeneration(
+  postId: number,
+  numImages: number,
+  imageStyle: string,
+  imageService: string,
+) {
+  try {
+    console.log(
+      `Processing image generation: ${numImages} images with style "${imageStyle}" using service "${imageService}" for post ${postId}`,
+    )
+
+    const response = await fetch(
+      `/api/posts/${postId}/generate-images?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}&image_service=${encodeURIComponent(imageService)}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    )
+
+    if (!response.ok) {
+      const errorMessage = await handleApiError(response)
+      console.error("Failed to generate images:", errorMessage)
+      return { success: false, error: errorMessage }
+    }
+
+    const result = await response.json()
+
+    // Return the result with appropriate status
+    if (result.data?.status === "processing") {
+      return {
+        success: true,
+        status: "processing",
+        message: result.data.message || "Image generation started in background",
+      }
+    }
+
+    if (result.data?.images && Array.isArray(result.data.images) && result.data.images.length > 0) {
+      return {
+        success: true,
+        status: "completed",
+        images: result.data.images,
+      }
+    }
+
+    if (result.success) {
+      return {
+        success: true,
+        status: "processing",
+        message: "Image generation in progress",
+      }
+    }
+
+    return {
+      success: false,
+      error: "API returned no image data",
+    }
+  } catch (error) {
+    console.error("Error in processImageGeneration:", error)
+    return {
+      success: false,
+      error: "Failed to process image generation: " + (error instanceof Error ? error.message : String(error)),
+    }
+  }
+}
+
+// Handle API error responses
+export async function handleApiError(response: Response): Promise<string> {
+  const errorMessage = `Error: ${response.status} ${response.statusText}`
+
+  try {
+    const errorData = await response.json()
+    return errorData.error || errorMessage
+  } catch {
+    try {
+      const errorText = await response.text()
+      return errorText ? `${errorMessage} - ${errorText.substring(0, 100)}` : errorMessage
+    } catch {
+      return errorMessage
     }
   }
 }

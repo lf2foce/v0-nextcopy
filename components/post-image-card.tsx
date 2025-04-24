@@ -1,0 +1,301 @@
+"use client"
+
+import type React from "react"
+
+import { useState, useRef } from "react"
+import Image from "next/image"
+import type { Post } from "./campaign-workflow"
+import { RefreshCw, Loader2, Check, AlertCircle, MinusCircle, PlusCircle, ChevronDown } from "lucide-react"
+
+// Available image styles
+export const IMAGE_STYLES = [
+  { value: "realistic", label: "Realistic" },
+  { value: "cartoon", label: "Cartoon" },
+  { value: "illustration", label: "Illustration" },
+  { value: "watercolor", label: "Watercolor" },
+  { value: "sketch", label: "Sketch" },
+  { value: "3d_render", label: "3D Render" },
+  { value: "pixel_art", label: "Pixel Art" },
+  { value: "oil_painting", label: "Oil Painting" },
+]
+
+// Available image services
+export const IMAGE_SERVICES = [
+  { value: "flux", label: "Flux" },
+  { value: "gemini", label: "Gemini" },
+  { value: "ideogram", label: "Ideogram" },
+]
+
+export interface PostImage {
+  url: string
+  prompt: string
+  order: number
+  isSelected: boolean
+  metadata?: {
+    width: number
+    height: string
+    style: string
+    service?: string
+  }
+}
+
+interface PostImageCardProps {
+  post: Post
+  index: number
+  isGenerating: boolean
+  isPolling: boolean
+  hasError: boolean
+  errorMessage?: string
+  numImages: number
+  imageStyle: string
+  imageService: string
+  isSubmitting: boolean
+  onRegenerateImages: (postId: string | number) => void
+  onToggleImageSelection: (postId: string | number, imageIndex: number) => void
+  onChangeNumImages: (postId: string | number, value: number) => void
+  onChangeImageStyle: (postId: string | number, style: string) => void
+  onChangeImageService: (postId: string | number, service: string) => void
+}
+
+export function getPostImages(post: Post): PostImage[] {
+  if (!post.images) return []
+
+  try {
+    const imagesData = JSON.parse(post.images)
+    return imagesData.images?.images || imagesData.images || []
+  } catch (e) {
+    console.error("Error parsing images JSON:", e)
+    return []
+  }
+}
+
+export function hasRealImages(post: Post): boolean {
+  const images = getPostImages(post)
+  if (images.length === 0) return false
+  return images.some((img) => !img.url.includes("placeholder.svg"))
+}
+
+export default function PostImageCard({
+  post,
+  index,
+  isGenerating,
+  isPolling,
+  hasError,
+  errorMessage,
+  numImages,
+  imageStyle,
+  imageService,
+  isSubmitting,
+  onRegenerateImages,
+  onToggleImageSelection,
+  onChangeNumImages,
+  onChangeImageStyle,
+  onChangeImageService,
+}: PostImageCardProps) {
+  const isProcessing = isGenerating || isPolling
+  const postImages = getPostImages(post)
+  const hasGeneratedImages = hasRealImages(post)
+
+  // Dropdown state
+  const [styleDropdownOpen, setStyleDropdownOpen] = useState(false)
+  const [serviceDropdownOpen, setServiceDropdownOpen] = useState(false)
+  const styleDropdownRef = useRef<HTMLDivElement>(null)
+  const serviceDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Handle dropdown clicks
+  const toggleStyleDropdown = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setStyleDropdownOpen(!styleDropdownOpen)
+    setServiceDropdownOpen(false)
+  }
+
+  const toggleServiceDropdown = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setServiceDropdownOpen(!serviceDropdownOpen)
+    setStyleDropdownOpen(false)
+  }
+
+  const selectStyle = (style: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    onChangeImageStyle(post.id, style)
+    setStyleDropdownOpen(false)
+  }
+
+  const selectService = (service: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    onChangeImageService(post.id, service)
+    setServiceDropdownOpen(false)
+  }
+
+  return (
+    <div className="border-4 border-black rounded-md overflow-hidden bg-white">
+      <div className="p-4 bg-yellow-100 border-b-4 border-black flex justify-between items-center">
+        <h3 className="font-bold text-lg">Post {index + 1}</h3>
+        <div className="flex items-center gap-4">
+          {hasGeneratedImages && (
+            <span className="text-sm font-medium">
+              {postImages.filter((img) => img.isSelected).length} of {postImages.length} selected
+            </span>
+          )}
+
+          {/* Image generation controls */}
+          <div className="flex items-center gap-2">
+            {/* Number of images selector */}
+            <div className="flex items-center gap-2 bg-white border-2 border-black rounded-md px-2 py-1">
+              <button
+                onClick={() => onChangeNumImages(post.id, Math.max(1, numImages - 1))}
+                disabled={numImages <= 1 || isProcessing}
+                className="text-black hover:text-gray-700 disabled:opacity-50"
+              >
+                <MinusCircle size={16} />
+              </button>
+              <span className="text-sm font-medium w-5 text-center">{numImages}</span>
+              <button
+                onClick={() => onChangeNumImages(post.id, Math.min(10, numImages + 1))}
+                disabled={numImages >= 10 || isProcessing}
+                className="text-black hover:text-gray-700 disabled:opacity-50"
+              >
+                <PlusCircle size={16} />
+              </button>
+            </div>
+
+            {/* Style selector dropdown */}
+            <div className="relative" ref={styleDropdownRef}>
+              <button
+                onClick={toggleStyleDropdown}
+                disabled={isProcessing}
+                className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 py-1 text-sm w-32 disabled:opacity-50"
+              >
+                <span>{IMAGE_STYLES.find((style) => style.value === imageStyle)?.label || "Realistic"}</span>
+                <ChevronDown size={14} className={styleDropdownOpen ? "transform rotate-180" : ""} />
+              </button>
+
+              {styleDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-40 bg-white border-2 border-black rounded-md shadow-lg">
+                  {IMAGE_STYLES.map((style) => (
+                    <button
+                      key={style.value}
+                      onClick={(e) => selectStyle(style.value, e)}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
+                        imageStyle === style.value ? "bg-yellow-100 font-medium" : ""
+                      }`}
+                    >
+                      {style.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Image service selector dropdown */}
+            <div className="relative" ref={serviceDropdownRef}>
+              <button
+                onClick={toggleServiceDropdown}
+                disabled={isProcessing}
+                className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 py-1 text-sm w-32 disabled:opacity-50"
+              >
+                <span>{IMAGE_SERVICES.find((service) => service.value === imageService)?.label || "Flux"}</span>
+                <ChevronDown size={14} className={serviceDropdownOpen ? "transform rotate-180" : ""} />
+              </button>
+
+              {serviceDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-40 bg-white border-2 border-black rounded-md shadow-lg">
+                  {IMAGE_SERVICES.map((service) => (
+                    <button
+                      key={service.value}
+                      onClick={(e) => selectService(service.value, e)}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
+                        imageService === service.value ? "bg-yellow-100 font-medium" : ""
+                      }`}
+                    >
+                      {service.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => onRegenerateImages(post.id)}
+              disabled={isProcessing || isSubmitting}
+              className="py-1 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 flex items-center gap-1 text-sm disabled:opacity-50"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  {isPolling ? "Generating..." : "Regenerating..."}
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={14} />
+                  {hasGeneratedImages ? "Regenerate Images" : "Generate Images"}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4">
+        <p className="text-lg mb-4 line-clamp-2">{post.content}</p>
+
+        {isProcessing ? (
+          <div className="h-64 flex flex-col items-center justify-center bg-gray-50 border-2 border-gray-300 border-dashed rounded-lg">
+            <Loader2 size={32} className="animate-spin text-black mb-2" />
+            <span className="font-medium">
+              Generating {numImages} {IMAGE_STYLES.find((style) => style.value === imageStyle)?.label || "Realistic"}{" "}
+              style image
+              {numImages > 1 ? "s" : ""} using{" "}
+              {IMAGE_SERVICES.find((service) => service.value === imageService)?.label || "Flux"}...
+            </span>
+            {isPolling && <p className="text-sm text-gray-500 mt-2">This may take a minute. Please wait...</p>}
+          </div>
+        ) : hasError ? (
+          <div className="h-64 flex flex-col items-center justify-center bg-red-50 border-2 border-red-300 border-dashed rounded-lg p-4">
+            <AlertCircle size={32} className="text-red-500 mb-2" />
+            <p className="font-medium text-red-700 text-center">Error generating images</p>
+            <p className="text-sm text-red-600 text-center mt-2">{errorMessage}</p>
+          </div>
+        ) : hasGeneratedImages ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {postImages.map((image, imageIndex) => (
+                <div
+                  key={imageIndex}
+                  onClick={() => onToggleImageSelection(post.id, imageIndex)}
+                  className={`relative border-4 ${
+                    image.isSelected ? "border-green-500" : "border-black"
+                  } rounded-md overflow-hidden h-40 cursor-pointer`}
+                >
+                  <Image
+                    src={image.url || "/placeholder.svg"}
+                    alt={`Image ${imageIndex + 1} for post ${index + 1}`}
+                    fill
+                    className="object-cover"
+                  />
+                  <div
+                    className={`absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded-full ${
+                      image.isSelected ? "bg-green-500 text-white" : "bg-white border-2 border-black"
+                    }`}
+                  >
+                    {image.isSelected && <Check size={16} />}
+                  </div>
+                  <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                    {image.metadata?.service
+                      ? `${image.metadata.service} - ${image.metadata.style || imageStyle}`
+                      : `Style: ${image.metadata?.style || imageStyle}`}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-sm text-gray-600">Click on an image to select or deselect it.</p>
+          </div>
+        ) : (
+          <div className="h-64 flex items-center justify-center bg-gray-50 border-2 border-gray-300 border-dashed rounded-lg">
+            <span className="ml-2 font-medium">No images generated yet.</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

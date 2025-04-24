@@ -12,13 +12,19 @@ export async function GET(request: NextRequest, { params }: { params: { themeId:
 
     // Call the external API
     try {
-      const response = await fetch(`${process.env.FASTAPI_URL}/themes/${themeId}/status`, {
+      const fastApiUrl = process.env.FASTAPI_URL
+      if (!fastApiUrl) {
+        return NextResponse.json(
+          { success: false, error: "FASTAPI_URL environment variable is not set" },
+          { status: 500 },
+        )
+      }
+      const response = await fetch(`${fastApiUrl}/themes/${themeId}/status`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        signal: AbortSignal.timeout(30000), // 30 second timeout
       })
 
       // Log the response status
