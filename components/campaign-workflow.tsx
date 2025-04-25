@@ -240,13 +240,26 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
     if (campaign?.id) {
       try {
         const steps = await getCampaignSteps()
-        await updateCampaignStep(campaign.id, steps.COMPLETION) // Now using 7 instead of 8
+
+        // First update the local state to ensure UI consistency
+        setCurrentStep(6) // Move to completion step (index 6 in steps array)
+
+        // Then update the database - but don't rely on this for UI state
+        await updateCampaignStep(campaign.id, steps.COMPLETION)
       } catch (error) {
         console.error("Failed to update campaign step:", error)
+        toast({
+          title: "Warning",
+          description: "Review completed but step not updated in database",
+          variant: "destructive",
+        })
       }
+    } else {
+      // If no campaign ID, just update the UI state
+      setCurrentStep(6)
     }
 
-    nextStep()
+    // No need to call nextStep() since we've already set the current step directly
   }
 
   const handleScheduleComplete = () => {

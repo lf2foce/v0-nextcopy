@@ -422,11 +422,19 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
       }
     }
 
-    // Short delay to show loading state
-    setTimeout(() => {
+    // Call onComplete immediately without setTimeout
+    try {
       onComplete(localPosts)
+    } catch (error) {
+      console.error("Error finalizing review:", error)
+      toast({
+        title: "Error",
+        description: "Failed to finalize review",
+        variant: "destructive",
+      })
+    } finally {
       setIsFinalizing(false)
-    }, 800)
+    }
   }
 
   // Add a function to open the image viewer modal
