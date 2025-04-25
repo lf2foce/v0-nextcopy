@@ -232,13 +232,24 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
     nextStep()
   }
 
-  const handleReviewComplete = async (finalPosts: Post[]) => {
+  // Updated handleReviewComplete function that doesn't need to update the database
+  // since that's already done in review-posts.tsx
+  const handleReviewComplete = (finalPosts: Post[], updatedCampaign?: any) => {
     console.log("Review completed with posts:", finalPosts)
+
+    // Store the reviewed posts
     setReviewedPosts(finalPosts)
 
-    // We don't need to update the database here since it's already done in review-posts.tsx
-    // Just update the UI state to move to the completion step
-    setCurrentStep(6) // Move to completion step (index 6 in steps array)
+    // If we received an updated campaign object, update our local state
+    if (updatedCampaign && campaign) {
+      setCampaign({
+        ...campaign,
+        currentStep: updatedCampaign.currentStep,
+      })
+    }
+
+    // Move to the completion step
+    setCurrentStep(6)
   }
 
   const handleScheduleComplete = () => {

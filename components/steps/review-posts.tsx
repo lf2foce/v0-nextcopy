@@ -10,7 +10,7 @@ import ImageViewerModal from "../ui/image-viewer-modal"
 
 interface ReviewPostsProps {
   posts: Post[]
-  onComplete: (posts: Post[]) => void
+  onComplete: (posts: Post[], updatedCampaign?: any) => void
   onBack: () => void
 }
 
@@ -398,6 +398,7 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
   }
 
   // Improved handleComplete function that waits for database update
+  // and passes the updated campaign data to the parent component
   const handleComplete = async () => {
     setIsFinalizing(true)
 
@@ -424,10 +425,10 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
         // Only proceed if database update was successful
         console.log("Database update successful, proceeding to next step")
 
-        // Call onComplete with the posts - only after successful database update
-        onComplete(localPosts)
+        // Pass both the posts and the updated campaign data to the parent component
+        onComplete(localPosts, result.data)
       } else {
-        // If no campaign ID, just call onComplete
+        // If no campaign ID, just call onComplete with posts
         onComplete(localPosts)
       }
     } catch (error) {
