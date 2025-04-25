@@ -10,7 +10,7 @@ import ReviewPosts from "./steps/review-posts"
 import CompletionStep from "./steps/completion-step"
 import WorkflowProgress from "./workflow-progress"
 import { useToast } from "@/hooks/use-toast"
-import { updateCampaignStep, getCampaignSteps } from "@/lib/actions_api"
+import { updateCampaignStep } from "@/lib/actions_api"
 import GenerateMultipleImages from "./steps/generate-multiple-images"
 
 // Update the Campaign type to match the new schema
@@ -236,30 +236,9 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
     console.log("Review completed with posts:", finalPosts)
     setReviewedPosts(finalPosts)
 
-    // Update to step 7 (Completion) when review is complete
-    if (campaign?.id) {
-      try {
-        const steps = await getCampaignSteps()
-
-        // First update the local state to ensure UI consistency
-        setCurrentStep(6) // Move to completion step (index 6 in steps array)
-
-        // Then update the database - but don't rely on this for UI state
-        await updateCampaignStep(campaign.id, steps.COMPLETION)
-      } catch (error) {
-        console.error("Failed to update campaign step:", error)
-        toast({
-          title: "Warning",
-          description: "Review completed but step not updated in database",
-          variant: "destructive",
-        })
-      }
-    } else {
-      // If no campaign ID, just update the UI state
-      setCurrentStep(6)
-    }
-
-    // No need to call nextStep() since we've already set the current step directly
+    // We don't need to update the database here since it's already done in review-posts.tsx
+    // Just update the UI state to move to the completion step
+    setCurrentStep(6) // Move to completion step (index 6 in steps array)
   }
 
   const handleScheduleComplete = () => {

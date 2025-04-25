@@ -191,17 +191,36 @@ export async function updatePostVideos(postsToUpdate: { id: number; video: strin
   }
 }
 
-// Complete review
+// Update the completeReview function to be more robust
 export async function completeReview(campaignId: number) {
   try {
     console.log("Completing review for campaign:", campaignId)
 
     // Update campaign step to Completion (now 7 instead of 8)
     const CAMPAIGN_STEPS = await getCampaignSteps()
-    await updateCampaignStep(campaignId, CAMPAIGN_STEPS.COMPLETION)
+
+    // Update the campaign step in the database
+    const updateResult = await db
+      .update(campaigns)
+      .set({ currentStep: CAMPAIGN_STEPS.COMPLETION })
+      .where(eq(campaigns.id, campaignId))
+      .returning()
+
+    // Check if the update was successful
+    if (!updateResult || updateResult.length === 0) {
+      return {
+        success: false,
+        error: "Failed to update campaign step: No rows updated",
+      }
+    }
 
     revalidatePath("/campaigns")
-    return { success: true }
+    revalidatePath(`/campaigns/${campaignId}`)
+
+    return {
+      success: true,
+      data: updateResult[0],
+    }
   } catch (error) {
     console.error("Failed to complete review:", error)
     return {

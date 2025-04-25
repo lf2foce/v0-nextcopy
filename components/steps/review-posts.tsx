@@ -404,37 +404,35 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
   const handleComplete = async () => {
     setIsFinalizing(true)
 
-    // Find the campaign ID from the first post
-    const campaignId =
-      localPosts.length > 0 && typeof localPosts[0].campaignId === "number" ? localPosts[0].campaignId : null
-
-    if (campaignId) {
-      try {
-        // Update to step 6 (Review) when review is complete
-        await completeReview(campaignId)
-      } catch (error) {
-        console.error("Error completing review:", error)
-        toast({
-          title: "Warning",
-          description: "Review completed but step not updated in database",
-          variant: "destructive",
-        })
-      }
-    }
-
-    // Call onComplete immediately without setTimeout
     try {
+      // Find the campaign ID from the first post
+      const campaignId =
+        localPosts.length > 0 && typeof localPosts[0].campaignId === "number" ? localPosts[0].campaignId : null
+
+      if (campaignId) {
+        // Update to step 7 (COMPLETION) when review is complete
+        const result = await completeReview(campaignId)
+
+        if (!result.success) {
+          throw new Error(result.error || "Failed to update campaign step")
+        }
+
+        // Only proceed if database update was successful
+        console.log("Database update successful, proceeding to next step")
+      }
+
+      // Call onComplete with the posts
       onComplete(localPosts)
     } catch (error) {
       console.error("Error finalizing review:", error)
       toast({
         title: "Error",
-        description: "Failed to finalize review",
+        description: "Failed to finalize review: " + (error instanceof Error ? error.message : String(error)),
         variant: "destructive",
       })
-    } finally {
-      setIsFinalizing(false)
+      setIsFinalizing(false) // Only reset if there's an error
     }
+    // Don't set isFinalizing to false on success - let the component unmount naturally
   }
 
   // Add a function to open the image viewer modal
