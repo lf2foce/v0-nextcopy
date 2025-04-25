@@ -76,14 +76,17 @@ export async function updateCampaignStep(campaignId: number, step: number) {
       status = "active" // Only set to active when fully scheduled (step 8)
     }
 
-    const [updatedCampaign] = await db
-      .update(campaigns)
-      .set({
-        currentStep: step,
-        status: status,
-      })
-      .where(eq(campaigns.id, campaignId))
-      .returning()
+    // Make sure we're actually setting values
+    const updateData = {
+      currentStep: step,
+    }
+
+    // Only update status if we're setting to active
+    if (status === "active") {
+      updateData.status = status
+    }
+
+    const [updatedCampaign] = await db.update(campaigns).set(updateData).where(eq(campaigns.id, campaignId)).returning()
 
     // Revalidate both the campaigns list and the specific campaign page
     revalidatePath("/campaigns")

@@ -44,6 +44,7 @@ export type Post = {
   image?: string
   imageUrl?: string
   videoUrl?: string
+  images?: string
   imageGenerated?: boolean
   videoGenerated?: boolean
   campaignId?: number
@@ -96,8 +97,28 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   const [isWorkflowComplete, setIsWorkflowComplete] = useState(false)
   const { toast } = useToast()
 
-  // Set initial step based on prop
+  // Set initial step based on prop and initialize data
   useEffect(() => {
+    // Initialize data from initialData
+    if (initialData) {
+      console.log("Initial data received:", initialData)
+
+      // Set posts with images if available
+      if (initialData.postsWithImages && initialData.postsWithImages.length > 0) {
+        setPostsWithImages(initialData.postsWithImages)
+
+        // If we're at or past the video step, also set these as postsWithVideos
+        if (initialStep >= 5 && !initialData.postsWithVideos) {
+          setPostsWithVideos(initialData.postsWithImages)
+        }
+      }
+
+      // Set posts with videos if available
+      if (initialData.postsWithVideos && initialData.postsWithVideos.length > 0) {
+        setPostsWithVideos(initialData.postsWithVideos)
+      }
+    }
+
     if (initialStep > 0) {
       // Map database step to UI step
       let uiStep = initialStep
@@ -128,14 +149,13 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
 
       setCurrentStep(uiStep)
     }
-  }, [initialStep])
+  }, [initialStep, initialData])
 
-  // Log initial data for debugging
+  // Debug logging for posts data
   useEffect(() => {
-    if (initialData) {
-      console.log("Initial data received:", initialData)
-    }
-  }, [initialData])
+    console.log("Current posts with images:", postsWithImages)
+    console.log("Current posts with videos:", postsWithVideos)
+  }, [postsWithImages, postsWithVideos])
 
   const nextStep = async () => {
     const newStep = Math.min(currentStep + 1, steps.length - 1)
@@ -183,11 +203,13 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   }
 
   const handleApproveContent = (approvedPosts: Post[]) => {
+    console.log("Posts approved:", approvedPosts)
     setSelectedPosts(approvedPosts)
     nextStep()
   }
 
   const handleGenerateImages = (updatedPosts: Post[]) => {
+    console.log("Posts with images:", updatedPosts)
     // Store the posts with their image selection state
     setPostsWithImages(updatedPosts)
 
@@ -205,11 +227,13 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   }
 
   const handleGenerateVideos = (updatedPosts: Post[]) => {
+    console.log("Posts with videos:", updatedPosts)
     setPostsWithVideos(updatedPosts)
     nextStep()
   }
 
   const handleReviewComplete = async (finalPosts: Post[]) => {
+    console.log("Review completed with posts:", finalPosts)
     setReviewedPosts(finalPosts)
 
     // Update to step 7 (Completion) when review is complete
@@ -237,6 +261,48 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   // Add this function to handle going back from the completion step to the review step
   const handleBackToReview = () => {
     setCurrentStep(5) // Go back to the Review step (index 5 in the updated steps array)
+  }
+
+  // Determine which posts to use for the video step
+  const getPostsForVideoStep = () => {
+    // First priority: use postsWithVideos if available
+    if (postsWithVideos && postsWithVideos.length > 0) {
+      return postsWithVideos
+    }
+
+    // Second priority: use postsWithImages if available
+    if (postsWithImages && postsWithImages.length > 0) {
+      return postsWithImages
+    }
+
+    // Third priority: use selectedPosts if available
+    if (selectedPosts && selectedPosts.length > 0) {
+      return selectedPosts
+    }
+
+    // Fallback to empty array
+    return []
+  }
+
+  // Determine which posts to use for the review step
+  const getPostsForReviewStep = () => {
+    // First priority: use postsWithVideos if available
+    if (postsWithVideos && postsWithVideos.length > 0) {
+      return postsWithVideos
+    }
+
+    // Second priority: use postsWithImages if available
+    if (postsWithImages && postsWithImages.length > 0) {
+      return postsWithImages
+    }
+
+    // Third priority: use selectedPosts if available
+    if (selectedPosts && selectedPosts.length > 0) {
+      return selectedPosts
+    }
+
+    // Fallback to empty array
+    return []
   }
 
   return (
@@ -277,23 +343,19 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
           />
         )}
 
-        {currentStep === 4 && postsWithImages.length > 0 && (
-          <GenerateVideo posts={postsWithImages} onComplete={handleGenerateVideos} onBack={prevStep} />
+        {currentStep === 4 && (
+          <GenerateVideo posts={getPostsForVideoStep()} onComplete={handleGenerateVideos} onBack={prevStep} />
         )}
 
         {currentStep === 5 && (
-          <ReviewPosts
-            posts={postsWithVideos.length > 0 ? postsWithVideos : postsWithImages}
-            onComplete={handleReviewComplete}
-            onBack={prevStep}
-          />
+          <ReviewPosts posts={getPostsForReviewStep()} onComplete={handleReviewComplete} onBack={prevStep} />
         )}
 
-        {currentStep === 6 && campaign && selectedTheme && reviewedPosts.length > 0 && (
+        {currentStep === 6 && campaign && selectedTheme && (
           <CompletionStep
             campaign={campaign}
             theme={selectedTheme}
-            posts={reviewedPosts}
+            posts={reviewedPosts.length > 0 ? reviewedPosts : getPostsForReviewStep()}
             onScheduleComplete={handleScheduleComplete}
             onBack={handleBackToReview}
           />
@@ -317,28 +379,12 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
           </div>
         )}
 
-        {currentStep === 5 && (!postsWithImages || postsWithImages.length === 0) && (
-          <div className="text-center p-8">
-            <p className="text-lg font-bold text-red-600">Missing data for review step</p>
-            <p className="text-gray-600 mt-2">
-              No posts with images are available. Please go back to the previous steps and generate images first.
-            </p>
-            <button
-              onClick={prevStep}
-              className="mt-4 py-2 px-4 bg-yellow-300 border-2 border-black rounded-md font-medium"
-            >
-              Go Back
-            </button>
-          </div>
-        )}
-
-        {currentStep === 6 && (!campaign || !selectedTheme || reviewedPosts.length === 0) && (
+        {currentStep === 6 && (!campaign || !selectedTheme) && (
           <div className="text-center p-8">
             <p className="text-lg font-bold text-red-600">Missing data for scheduling step</p>
             <p className="text-gray-600 mt-2">
               {!campaign && "Campaign data is missing. "}
               {!selectedTheme && "No theme has been selected. "}
-              {reviewedPosts.length === 0 && "No reviewed posts are available. "}
               Please go back to the previous steps and complete them.
             </p>
             <button

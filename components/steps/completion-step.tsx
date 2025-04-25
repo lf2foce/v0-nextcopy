@@ -28,10 +28,13 @@ export default function CompletionStep({ campaign, theme, posts, onScheduleCompl
       // Filter posts with numeric IDs (from the database)
       const postIds = posts.filter((post) => typeof post.id === "number").map((post) => post.id as number)
 
+      console.log("Scheduling posts with IDs:", postIds)
+
       if (postIds.length > 0) {
         const result = await schedulePosts(postIds)
 
         if (!result.success) {
+          console.error("Failed to schedule posts:", result.error)
           toast({
             title: "Error",
             description: result.error || "Failed to schedule posts",
@@ -40,6 +43,10 @@ export default function CompletionStep({ campaign, theme, posts, onScheduleCompl
           setShowScheduleAnimation(false)
           return
         }
+
+        console.log("Posts scheduled successfully")
+      } else {
+        console.log("No post IDs to schedule, simulating success")
       }
 
       // Simulate scheduling process
@@ -53,9 +60,10 @@ export default function CompletionStep({ campaign, theme, posts, onScheduleCompl
         onScheduleComplete()
       }, 1500)
     } catch (error) {
+      console.error("Error scheduling posts:", error)
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description: "An unexpected error occurred: " + (error instanceof Error ? error.message : String(error)),
         variant: "destructive",
       })
       setShowScheduleAnimation(false)

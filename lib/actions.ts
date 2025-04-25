@@ -86,14 +86,47 @@ export async function schedulePosts(postIds: number[]) {
   try {
     console.log("Scheduling posts with IDs:", postIds)
 
-    // Update posts to scheduled status
-    await db.update(contentPosts).set({ status: "scheduled" }).where(eq(contentPosts.id, postIds[0])) // Fix: Use eq for single ID
+    if (postIds.length === 0) {
+      console.log("No post IDs provided to schedule")
+      return { success: true }
+    }
 
-    revalidatePath("/campaigns")
+    // Update each post to scheduled status
+    for (const postId of postIds) {
+      await db.update(contentPosts).set({ status: "scheduled" }).where(eq(contentPosts.id, postId))
+    }
+
+    // Get the campaign ID from the first post
+    const [post] = await db.select().from(contentPosts).where(eq(contentPosts.id, postIds[0])).limit(1)
+
+    if (post && post.campaignId) {
+      // Update campaign step to SCHEDULED (8)
+      console.log(`Updating campaign ${post.campaignId} to step 8 (SCHEDULED)`)
+
+      // Get the steps
+      const CAMPAIGN_STEPS = await getCampaignSteps()
+
+      // Update the campaign status directly without using updateCampaignStep
+      await db
+        .update(campaigns)
+        .set({
+          currentStep: CAMPAIGN_STEPS.SCHEDULED,
+          status: "active", // Always set status to active when scheduling
+        })
+        .where(eq(campaigns.id, post.campaignId))
+
+      // Revalidate paths
+      revalidatePath("/campaigns")
+      revalidatePath(`/campaigns/${post.campaignId}`)
+    }
+
     return { success: true }
   } catch (error) {
     console.error("Failed to schedule posts:", error)
-    return { success: false, error: "Failed to schedule posts" }
+    return {
+      success: false,
+      error: "Failed to schedule posts: " + (error instanceof Error ? error.message : String(error)),
+    }
   }
 }
 
@@ -163,11 +196,18 @@ export async function completeReview(campaignId: number) {
   try {
     console.log("Completing review for campaign:", campaignId)
 
+    // Update campaign step to Completion (now 7 instead of 8)
+    const CAMPAIGN_STEPS = await getCampaignSteps()
+    await updateCampaignStep(campaignId, CAMPAIGN_STEPS.COMPLETION)
+
     revalidatePath("/campaigns")
     return { success: true }
   } catch (error) {
     console.error("Failed to complete review:", error)
-    return { success: false, error: "Failed to complete review" }
+    return {
+      success: false,
+      error: "Failed to complete review: " + (error instanceof Error ? error.message : String(error)),
+    }
   }
 }
 
@@ -196,7 +236,34 @@ export async function getCampaign(campaignId: number) {
     // Process data after fetching
     const selectedTheme = allThemes.find((theme) => theme.isSelected)
     const approvedPosts = allPosts.filter((post) => post.status === "approved")
-    const postsWithImages = allPosts.filter((post) => post.imageUrl)
+
+    // Consider posts with either imageUrl or images JSON as having images
+    const postsWithImages = allPosts.filter((post) => {
+      // Check for imageUrl
+      if (post.imageUrl && post.imageUrl !== "/placeholder.svg") return true
+
+      // Check for images in JSON
+      if (post.images) {
+        try {
+          const imagesData = JSON.parse(post.images)
+          const images = imagesData.images?.images || imagesData.images || []
+          return images.some(
+            (img: any) =>
+              img.isSelected && img.url && !img.url.includes("placeholder.svg") && !img.url.startsWith("blob:"),
+          )
+        } catch (e) {
+          console.error("Error parsing images JSON:", e)
+        }
+      }
+
+      return false
+    })
+
+    // Ensure all posts have videoUrl property (even if it's just a placeholder)
+    const postsWithVideosAndImages = postsWithImages.map((post) => ({
+      ...post,
+      videoUrl: post.videoUrl || "/placeholder.mp4",
+    }))
 
     return {
       success: true,
@@ -206,7 +273,7 @@ export async function getCampaign(campaignId: number) {
         selectedTheme,
         allPosts,
         approvedPosts,
-        postsWithImages,
+        postsWithImages: postsWithVideosAndImages,
       },
     }
   } catch (error) {
@@ -311,5 +378,34 @@ export async function selectTheme() {
   return {
     success: false,
     error: "selectTheme is not implemented",
+  }
+}
+
+// Add this function to the end of the file
+
+// Define step constants for clarity
+export async function getCampaignSteps() {
+  return {
+    NEW: 0,
+    GENERATE_THEME: 2, // Both theme steps combined as 2
+    SELECT_THEME: 2, // Both theme steps combined as 2
+    GENERATE_POST: 3, // Both post steps combined as 3
+    APPROVE_POST: 3, // Both post steps combined as 3
+    GENERATE_IMAGES: 4, // Updated from 5 to 4
+    GENERATE_VIDEO: 5, // Updated from 6 to 5
+    REVIEW: 6, // Updated from 7 to 6
+    COMPLETION: 7, // Updated from 8 to 7
+    SCHEDULED: 8, // Updated from 9 to 8
+  }
+}
+
+async function updateCampaignStep(campaignId: number, step: number) {
+  try {
+    await db.update(campaigns).set({ currentStep: step }).where(eq(campaigns.id, campaignId))
+    revalidatePath(`/campaigns/${campaignId}`)
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to update campaign step:", error)
+    return { success: false, error: "Failed to update campaign step" }
   }
 }
