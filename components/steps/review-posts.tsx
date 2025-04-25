@@ -6,11 +6,12 @@ import type { Post } from "../campaign-workflow"
 import { CheckCircle, RefreshCw, Edit, Save, Loader2, X, Eye, Play, Check } from "lucide-react"
 import { updatePostContent, updatePostImages, updatePostVideos, completeReview } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
+// First, import the new ImageViewerModal component
 import ImageViewerModal from "../ui/image-viewer-modal"
 
 interface ReviewPostsProps {
   posts: Post[]
-  onComplete: (posts: Post[], updatedCampaign?: any) => void
+  onComplete: (posts: Post[]) => void
   onBack: () => void
 }
 
@@ -102,12 +103,22 @@ const getSelectedImages = (post: Post) => {
     return (imagesData.images || []).filter((img: any) => img.isSelected === true)
   } catch (e) {
     console.error("Error parsing images JSON:", e)
+
+    // Fallback to single image if JSON parsing fails
+    if (post.image || post.imageUrl) {
+      return [{ url: post.image || post.imageUrl, isSelected: true }]
+    }
+
     return []
   }
 }
 
 export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsProps) {
-  const [localPosts, setLocalPosts] = useState<Post[]>(posts)
+  // Ensure we have valid posts with at least content
+  const validPosts = posts.filter((post) => post && post.content)
+
+  // If no valid posts, show a message
+  const [localPosts, setLocalPosts] = useState<Post[]>(validPosts)
   const [editingPostId, setEditingPostId] = useState<string | number | null>(null)
   const [editContent, setEditContent] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -116,7 +127,9 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
   const [regeneratingVideoId, setRegeneratingVideoId] = useState<string | number | null>(null)
   const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null)
   const { toast } = useToast()
+  // First, add a new state for the finalize loading state
   const [isFinalizing, setIsFinalizing] = useState(false)
+  // Add a new state for the image viewer modal
   const [viewerImages, setViewerImages] = useState<any[]>([])
   const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0)
@@ -397,50 +410,33 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
     setVideoModalUrl(videoUrl)
   }
 
-  // Improved handleComplete function that waits for database update
-  // and passes the updated campaign data to the parent component
+  // Then update the handleComplete function to include loading state
   const handleComplete = async () => {
     setIsFinalizing(true)
 
-    try {
-      // Find the campaign ID from the first post
-      const campaignId =
-        localPosts.length > 0 && typeof localPosts[0].campaignId === "number" ? localPosts[0].campaignId : null
+    // Find the campaign ID from the first post
+    const campaignId =
+      localPosts.length > 0 && typeof localPosts[0].campaignId === "number" ? localPosts[0].campaignId : null
 
-      if (campaignId) {
-        // Update to step 7 (COMPLETION) when review is complete
-        const result = await completeReview(campaignId)
-
-        if (!result.success) {
-          console.error("Error completing review:", result.error)
-          toast({
-            title: "Error",
-            description: "Failed to update database. Please try again.",
-            variant: "destructive",
-          })
-          setIsFinalizing(false)
-          return
-        }
-
-        // Only proceed if database update was successful
-        console.log("Database update successful, proceeding to next step")
-
-        // Pass both the posts and the updated campaign data to the parent component
-        onComplete(localPosts, result.data)
-      } else {
-        // If no campaign ID, just call onComplete with posts
-        onComplete(localPosts)
+    if (campaignId) {
+      try {
+        // Update to step 6 (Review) when review is complete
+        await completeReview(campaignId)
+      } catch (error) {
+        console.error("Error completing review:", error)
+        toast({
+          title: "Warning",
+          description: "Review completed but step not updated in database",
+          variant: "destructive",
+        })
       }
-    } catch (error) {
-      console.error("Error finalizing review:", error)
-      toast({
-        title: "Error",
-        description: "Failed to finalize review: " + (error instanceof Error ? error.message : String(error)),
-        variant: "destructive",
-      })
-      setIsFinalizing(false) // Only reset if there's an error
     }
-    // Don't set isFinalizing to false on success - let the component unmount naturally
+
+    // Short delay to show loading state
+    setTimeout(() => {
+      onComplete(localPosts)
+      setIsFinalizing(false)
+    }, 800)
   }
 
   // Add a function to open the image viewer modal
@@ -453,6 +449,23 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
   // Add a function to close the image viewer modal
   const closeImageViewer = () => {
     setViewerOpen(false)
+  }
+
+  if (validPosts.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-black mb-2">Review Posts</h2>
+          <p className="text-gray-700">No valid posts found to review. Please go back and generate content first.</p>
+        </div>
+        <button
+          onClick={onBack}
+          className="py-3 px-6 bg-white border-4 border-black rounded-md font-bold text-lg hover:bg-gray-100 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+        >
+          Back
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -556,15 +569,24 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
                       let postImages = []
 
                       try {
-                        const imagesData = JSON.parse(post.images)
-                        postImages = imagesData.images || []
+                        if (post.images) {
+                          const imagesData = JSON.parse(post.images)
+                          postImages = imagesData.images || []
+                        } else if (post.image || post.imageUrl) {
+                          // Fallback to single image if it exists
+                          postImages = [{ url: post.image || post.imageUrl, isSelected: true }]
+                        }
                       } catch (e) {
+                        console.error("Error parsing images:", e)
                         // If JSON parsing fails, fallback to single image if it exists
                         if (post.image || post.imageUrl) {
-                          postImages = [{ url: post.image || post.imageUrl }]
-                        } else {
-                          postImages = [] // No images available
+                          postImages = [{ url: post.image || post.imageUrl, isSelected: true }]
                         }
+                      }
+
+                      // If still no images, show a placeholder
+                      if (postImages.length === 0) {
+                        postImages = [{ url: "/placeholder.svg", isSelected: true, isPlaceholder: true }]
                       }
 
                       const toggleImageSelection = async (postId: string | number, imageIndex: number) => {
@@ -751,17 +773,13 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
         <button
           onClick={onBack}
           disabled={
-            isSubmitting ||
-            !!regeneratingPostId ||
-            !!regeneratingImageId ||
-            !!editingPostId ||
-            !!regeneratingVideoId ||
-            isFinalizing
+            isSubmitting || !!regeneratingPostId || !!regeneratingImageId || !!editingPostId || !!regeneratingVideoId
           }
           className="py-3 px-6 bg-white border-4 border-black rounded-md font-bold text-lg hover:bg-gray-100 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:opacity-70"
         >
           Back
         </button>
+        {/* Finally, update the Finalize button to show loading state */}
         <button
           onClick={handleComplete}
           disabled={

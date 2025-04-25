@@ -56,19 +56,9 @@ export default async function EditCampaignPage({
         initialData.selectedPosts = fullCampaignResult.data.approvedPosts
       }
 
-      // Add posts with images if available (for step 4+)
+      // Add posts with images if available (for step 6)
       if (fullCampaignResult.data.postsWithImages?.length > 0) {
         initialData.postsWithImages = fullCampaignResult.data.postsWithImages
-
-        // Also set these as postsWithVideos if we're at or past the video step
-        if (campaignResult.data.currentStep >= 5) {
-          initialData.postsWithVideos = fullCampaignResult.data.postsWithImages.map((post: any) => ({
-            ...post,
-            videoGenerated: !!post.videoUrl && post.videoUrl !== "/placeholder.mp4",
-            // Ensure we have video URLs for all posts
-            videoUrl: post.videoUrl || "/placeholder.mp4",
-          }))
-        }
       }
     }
 

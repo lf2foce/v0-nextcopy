@@ -18,6 +18,7 @@ import {
 import { useRouter } from "next/navigation"
 import { toggleCampaignActiveStatus } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
+import CampaignWorkflow from "@/components/workflow/campaign-workflow"
 
 export default function CampaignDetailClient({ initialCampaign }: { initialCampaign: any }) {
   const router = useRouter()
@@ -299,6 +300,20 @@ export default function CampaignDetailClient({ initialCampaign }: { initialCampa
               </div>
             )}
           </div>
+
+          <CampaignWorkflow
+            initialCampaign={campaign}
+            initialStep={campaign.currentStep || 0}
+            initialData={{
+              campaign: campaign,
+              themes: campaign.allThemes || [],
+              selectedTheme: campaign.selectedTheme || null,
+              posts: campaign.allPosts || [],
+              selectedPosts: campaign.approvedPosts || [],
+              postsWithImages: campaign.postsWithImages || [],
+              postsWithVideos: campaign.postsWithVideos || [],
+            }}
+          />
         </div>
 
         {/* Right Column - Stats and Actions */}

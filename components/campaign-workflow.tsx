@@ -10,7 +10,7 @@ import ReviewPosts from "./steps/review-posts"
 import CompletionStep from "./steps/completion-step"
 import WorkflowProgress from "./workflow-progress"
 import { useToast } from "@/hooks/use-toast"
-import { updateCampaignStep } from "@/lib/actions_api"
+import { updateCampaignStep, getCampaignSteps } from "@/lib/actions_api"
 import GenerateMultipleImages from "./steps/generate-multiple-images"
 
 // Update the Campaign type to match the new schema
@@ -44,7 +44,6 @@ export type Post = {
   image?: string
   imageUrl?: string
   videoUrl?: string
-  images?: string
   imageGenerated?: boolean
   videoGenerated?: boolean
   campaignId?: number
@@ -97,28 +96,8 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   const [isWorkflowComplete, setIsWorkflowComplete] = useState(false)
   const { toast } = useToast()
 
-  // Set initial step based on prop and initialize data
+  // Set initial step based on prop
   useEffect(() => {
-    // Initialize data from initialData
-    if (initialData) {
-      console.log("Initial data received:", initialData)
-
-      // Set posts with images if available
-      if (initialData.postsWithImages && initialData.postsWithImages.length > 0) {
-        setPostsWithImages(initialData.postsWithImages)
-
-        // If we're at or past the video step, also set these as postsWithVideos
-        if (initialStep >= 5 && !initialData.postsWithVideos) {
-          setPostsWithVideos(initialData.postsWithImages)
-        }
-      }
-
-      // Set posts with videos if available
-      if (initialData.postsWithVideos && initialData.postsWithVideos.length > 0) {
-        setPostsWithVideos(initialData.postsWithVideos)
-      }
-    }
-
     if (initialStep > 0) {
       // Map database step to UI step
       let uiStep = initialStep
@@ -149,13 +128,15 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
 
       setCurrentStep(uiStep)
     }
-  }, [initialStep, initialData])
+  }, [initialStep])
 
-  // Debug logging for posts data
+  // Log initial data for debugging
   useEffect(() => {
-    console.log("Current posts with images:", postsWithImages)
-    console.log("Current posts with videos:", postsWithVideos)
-  }, [postsWithImages, postsWithVideos])
+    if (initialData) {
+      console.log("Initial data received:", initialData)
+      console.log("Posts with videos:", initialData.postsWithVideos)
+    }
+  }, [initialData])
 
   const nextStep = async () => {
     const newStep = Math.min(currentStep + 1, steps.length - 1)
@@ -203,13 +184,11 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   }
 
   const handleApproveContent = (approvedPosts: Post[]) => {
-    console.log("Posts approved:", approvedPosts)
     setSelectedPosts(approvedPosts)
     nextStep()
   }
 
   const handleGenerateImages = (updatedPosts: Post[]) => {
-    console.log("Posts with images:", updatedPosts)
     // Store the posts with their image selection state
     setPostsWithImages(updatedPosts)
 
@@ -227,85 +206,71 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   }
 
   const handleGenerateVideos = (updatedPosts: Post[]) => {
-    console.log("Posts with videos:", updatedPosts)
     setPostsWithVideos(updatedPosts)
     nextStep()
   }
 
-  // Updated handleReviewComplete function that doesn't need to update the database
-  // since that's already done in review-posts.tsx
-  const handleReviewComplete = (finalPosts: Post[], updatedCampaign?: any) => {
-    console.log("Review completed with posts:", finalPosts)
-
-    // Store the reviewed posts
+  const handleReviewComplete = async (finalPosts: Post[]) => {
     setReviewedPosts(finalPosts)
 
-    // If we received an updated campaign object, update our local state
-    if (updatedCampaign && campaign) {
-      setCampaign({
-        ...campaign,
-        currentStep: updatedCampaign.currentStep,
-      })
+    // Update to step 7 (Completion) when review is complete
+    if (campaign?.id) {
+      try {
+        const steps = await getCampaignSteps()
+        await updateCampaignStep(campaign.id, steps.COMPLETION) // Now using 7 instead of 8
+      } catch (error) {
+        console.error("Failed to update campaign step:", error)
+      }
     }
 
-    // Move to the completion step
-    setCurrentStep(6)
+    nextStep()
   }
 
-  const handleScheduleComplete = () => {
+  const handleScheduleComplete = async () => {
     setIsWorkflowComplete(true)
-    toast({
-      title: "Campaign Scheduled",
-      description: "Your campaign has been successfully scheduled and is ready to go!",
-      variant: "success",
-    })
+
+    // Update to step 8 (SCHEDULED) when scheduling is complete
+    if (campaign?.id) {
+      try {
+        const steps = await getCampaignSteps()
+        console.log("Updating campaign to SCHEDULED step:", steps.SCHEDULED)
+        const result = await updateCampaignStep(campaign.id, steps.SCHEDULED)
+        console.log("Update campaign step result:", result)
+
+        if (result.success) {
+          toast({
+            title: "Campaign Scheduled",
+            description: "Your campaign has been successfully scheduled and is ready to go!",
+            variant: "success",
+          })
+        } else {
+          console.error("Failed to update campaign step:", result.error)
+          toast({
+            title: "Warning",
+            description: "Campaign was scheduled but status update failed. Please refresh the page.",
+            variant: "warning",
+          })
+        }
+      } catch (error) {
+        console.error("Failed to update campaign step:", error)
+        toast({
+          title: "Warning",
+          description: "Campaign was scheduled but status update failed. Please refresh the page.",
+          variant: "warning",
+        })
+      }
+    } else {
+      toast({
+        title: "Campaign Scheduled",
+        description: "Your campaign has been successfully scheduled and is ready to go!",
+        variant: "success",
+      })
+    }
   }
 
   // Add this function to handle going back from the completion step to the review step
   const handleBackToReview = () => {
     setCurrentStep(5) // Go back to the Review step (index 5 in the updated steps array)
-  }
-
-  // Determine which posts to use for the video step
-  const getPostsForVideoStep = () => {
-    // First priority: use postsWithVideos if available
-    if (postsWithVideos && postsWithVideos.length > 0) {
-      return postsWithVideos
-    }
-
-    // Second priority: use postsWithImages if available
-    if (postsWithImages && postsWithImages.length > 0) {
-      return postsWithImages
-    }
-
-    // Third priority: use selectedPosts if available
-    if (selectedPosts && selectedPosts.length > 0) {
-      return selectedPosts
-    }
-
-    // Fallback to empty array
-    return []
-  }
-
-  // Determine which posts to use for the review step
-  const getPostsForReviewStep = () => {
-    // First priority: use postsWithVideos if available
-    if (postsWithVideos && postsWithVideos.length > 0) {
-      return postsWithVideos
-    }
-
-    // Second priority: use postsWithImages if available
-    if (postsWithImages && postsWithImages.length > 0) {
-      return postsWithImages
-    }
-
-    // Third priority: use selectedPosts if available
-    if (selectedPosts && selectedPosts.length > 0) {
-      return selectedPosts
-    }
-
-    // Fallback to empty array
-    return []
   }
 
   return (
@@ -347,18 +312,32 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
         )}
 
         {currentStep === 4 && (
-          <GenerateVideo posts={getPostsForVideoStep()} onComplete={handleGenerateVideos} onBack={prevStep} />
+          <GenerateVideo
+            posts={postsWithImages.length > 0 ? postsWithImages : selectedPosts}
+            onComplete={handleGenerateVideos}
+            onBack={prevStep}
+          />
         )}
 
         {currentStep === 5 && (
-          <ReviewPosts posts={getPostsForReviewStep()} onComplete={handleReviewComplete} onBack={prevStep} />
+          <ReviewPosts
+            posts={
+              postsWithVideos.length > 0
+                ? postsWithVideos
+                : postsWithImages.length > 0
+                  ? postsWithImages
+                  : selectedPosts
+            }
+            onComplete={handleReviewComplete}
+            onBack={prevStep}
+          />
         )}
 
-        {currentStep === 6 && campaign && selectedTheme && (
+        {currentStep === 6 && campaign && selectedTheme && reviewedPosts.length > 0 && (
           <CompletionStep
             campaign={campaign}
             theme={selectedTheme}
-            posts={reviewedPosts.length > 0 ? reviewedPosts : getPostsForReviewStep()}
+            posts={reviewedPosts}
             onScheduleComplete={handleScheduleComplete}
             onBack={handleBackToReview}
           />
@@ -382,12 +361,31 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
           </div>
         )}
 
-        {currentStep === 6 && (!campaign || !selectedTheme) && (
+        {currentStep === 5 &&
+          (!postsWithImages || postsWithImages.length === 0) &&
+          (!postsWithVideos || postsWithVideos.length === 0) &&
+          (!selectedPosts || selectedPosts.length === 0) && (
+            <div className="text-center p-8">
+              <p className="text-lg font-bold text-red-600">Missing data for review step</p>
+              <p className="text-gray-600 mt-2">
+                No posts with content are available. Please go back to the previous steps and generate content first.
+              </p>
+              <button
+                onClick={prevStep}
+                className="mt-4 py-2 px-4 bg-yellow-300 border-2 border-black rounded-md font-medium"
+              >
+                Go Back
+              </button>
+            </div>
+          )}
+
+        {currentStep === 6 && (!campaign || !selectedTheme || reviewedPosts.length === 0) && (
           <div className="text-center p-8">
             <p className="text-lg font-bold text-red-600">Missing data for scheduling step</p>
             <p className="text-gray-600 mt-2">
               {!campaign && "Campaign data is missing. "}
               {!selectedTheme && "No theme has been selected. "}
+              {reviewedPosts.length === 0 && "No reviewed posts are available. "}
               Please go back to the previous steps and complete them.
             </p>
             <button

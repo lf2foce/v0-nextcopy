@@ -12,13 +12,21 @@ export default function CampaignEditClient({
   initialStep: number
   initialData: any
 }) {
+  // Log the initial data for debugging
+  useEffect(() => {
+    console.log("Campaign Edit Client - Initial Campaign:", initialCampaign)
+    console.log("Campaign Edit Client - Initial Step:", initialStep)
+    console.log("Campaign Edit Client - Initial Data:", initialData)
+  }, [initialCampaign, initialStep, initialData])
+
   const [isReady, setIsReady] = useState(false)
 
-  // Add a small delay to ensure all data is properly hydrated
+  // Add a delay to ensure all data is properly hydrated
   useEffect(() => {
     const timer = setTimeout(() => {
+      console.log("Setting isReady to true")
       setIsReady(true)
-    }, 100)
+    }, 300)
 
     return () => clearTimeout(timer)
   }, [])

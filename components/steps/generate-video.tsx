@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import type { Post } from "../campaign-workflow"
-import { Loader2, RefreshCw, Play, CheckCircle, Eye, AlertCircle } from "lucide-react"
+import { Loader2, RefreshCw, Play, CheckCircle, Eye } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { updatePostVideos } from "@/lib/actions"
 
@@ -100,15 +100,13 @@ interface GenerateVideoProps {
 }
 
 export default function GenerateVideo({ posts, onComplete, onBack }: GenerateVideoProps) {
-  const [localPosts, setLocalPosts] = useState<Post[]>([])
+  const [localPosts, setLocalPosts] = useState<Post[]>(posts)
   const [isGeneratingAll, setIsGeneratingAll] = useState(false)
   const [generatingPostId, setGeneratingPostId] = useState<string | number | null>(null)
   const [generationProgress, setGenerationProgress] = useState(0)
   const [allVideosGenerated, setAllVideosGenerated] = useState(false)
   const [isFinalizing, setIsFinalizing] = useState(false)
   const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
 
   // Progress interval reference
@@ -116,49 +114,27 @@ export default function GenerateVideo({ posts, onComplete, onBack }: GenerateVid
 
   // Check if posts already have videos (for when returning to this step)
   useEffect(() => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      console.log("Posts received in GenerateVideo:", posts)
-
-      // Handle empty posts array
-      if (!posts || posts.length === 0) {
-        setError("No posts available. Please go back and complete the previous steps.")
-        setIsLoading(false)
-        return
-      }
-
-      // Initialize localPosts with the provided posts
-      const updatedPosts = posts.map((post) => {
-        // If post doesn't have a videoUrl, add a placeholder
-        if (!post.videoUrl || post.videoUrl === "/placeholder.mp4") {
-          return {
-            ...post,
-            videoUrl: "/placeholder.mp4",
-            videoGenerated: false,
-          }
-        }
+    // Initialize localPosts with the provided posts
+    const postsWithValidData = posts.map((post) => {
+      // Ensure post has at least a placeholder video URL if none exists
+      if (!post.videoUrl) {
         return {
           ...post,
-          videoGenerated: true,
+          videoUrl: "/placeholder.mp4",
+          videoGenerated: false,
         }
-      })
+      }
+      return post
+    })
 
-      setLocalPosts(updatedPosts)
+    setLocalPosts(postsWithValidData)
 
-      // Check if ALL posts have valid videos
-      const hasAllVideos = updatedPosts.every((post) => {
-        return post.videoUrl && post.videoUrl !== "/placeholder.mp4"
-      })
+    // Check if ALL posts have valid videos
+    const hasAllVideos = postsWithValidData.every((post) => {
+      return post.videoUrl && post.videoUrl !== "/placeholder.mp4"
+    })
 
-      setAllVideosGenerated(hasAllVideos)
-      setIsLoading(false)
-    } catch (err) {
-      console.error("Error initializing video generation:", err)
-      setError("Failed to initialize video generation. Please try again.")
-      setIsLoading(false)
-    }
+    setAllVideosGenerated(hasAllVideos)
   }, [posts])
 
   // Clean up interval on unmount
@@ -179,15 +155,6 @@ export default function GenerateVideo({ posts, onComplete, onBack }: GenerateVid
 
   // Function to generate videos for all posts
   const generateAllVideos = async () => {
-    if (localPosts.length === 0) {
-      toast({
-        title: "Error",
-        description: "No posts available to generate videos for.",
-        variant: "destructive",
-      })
-      return
-    }
-
     setIsGeneratingAll(true)
     setGenerationProgress(0)
 
@@ -342,75 +309,25 @@ export default function GenerateVideo({ posts, onComplete, onBack }: GenerateVid
 
   // Helper function to get selected images from a post
   const getSelectedImages = (post: Post) => {
-    if (!post.images) return []
+    if (!post.images) {
+      // If no images JSON, check for single image
+      if (post.image || post.imageUrl) {
+        return [{ url: post.image || post.imageUrl, isSelected: true }]
+      }
+      return []
+    }
 
     try {
       const imagesData = JSON.parse(post.images)
       return (imagesData.images || []).filter((img: any) => img.isSelected === true)
     } catch (e) {
       console.error("Error parsing images JSON:", e)
+      // Fallback to single image if JSON parsing fails
+      if (post.image || post.imageUrl) {
+        return [{ url: post.image || post.imageUrl, isSelected: true }]
+      }
       return []
     }
-  }
-
-  // If loading, show loading state
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <Loader2 className="h-12 w-12 animate-spin text-gray-500 mb-4" />
-        <p className="text-lg font-medium">Loading video generation...</p>
-      </div>
-    )
-  }
-
-  // If error, show error state with back button
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-black mb-2">Generate Videos</h2>
-          <p className="text-gray-700">Create videos for your posts based on their content and images</p>
-        </div>
-
-        <div className="bg-red-50 border-4 border-red-300 rounded-md p-6 text-center">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-red-700 mb-2">Error Loading Video Step</h3>
-          <p className="text-red-600 mb-6">{error}</p>
-          <button
-            onClick={onBack}
-            className="py-3 px-6 bg-white border-4 border-black rounded-md font-bold text-lg hover:bg-gray-100 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // If no posts, show empty state
-  if (localPosts.length === 0) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-black mb-2">Generate Videos</h2>
-          <p className="text-gray-700">Create videos for your posts based on their content and images</p>
-        </div>
-
-        <div className="bg-yellow-50 border-4 border-yellow-300 rounded-md p-6 text-center">
-          <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-yellow-700 mb-2">No Posts Available</h3>
-          <p className="text-yellow-600 mb-6">
-            There are no posts available to generate videos for. Please go back and complete the previous steps.
-          </p>
-          <button
-            onClick={onBack}
-            className="py-3 px-6 bg-white border-4 border-black rounded-md font-bold text-lg hover:bg-gray-100 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -456,7 +373,7 @@ export default function GenerateVideo({ posts, onComplete, onBack }: GenerateVid
           const selectedImages = getSelectedImages(post)
 
           return (
-            <div key={post.id || index} className="border-4 border-black rounded-md p-4 bg-white">
+            <div key={post.id} className="border-4 border-black rounded-md p-4 bg-white">
               <div className="flex flex-col gap-4">
                 {/* Add post title/ID in the header */}
                 <div className="p-4 bg-yellow-100 border-b-4 border-black flex justify-between items-center">
@@ -472,7 +389,7 @@ export default function GenerateVideo({ posts, onComplete, onBack }: GenerateVid
                 </div>
 
                 {/* Post content */}
-                <p className="text-lg mb-2">{post.content || "No content available"}</p>
+                <p className="text-lg mb-2">{post.content}</p>
 
                 {/* Images row - ONLY SELECTED IMAGES */}
                 <div className="mb-4">
@@ -513,8 +430,6 @@ export default function GenerateVideo({ posts, onComplete, onBack }: GenerateVid
                             </div>
                           ))
                         } catch (e) {
-                          console.error("Error parsing images JSON:", e, post.images)
-
                           // Check if single image is a placeholder
                           if (post.image?.includes("placeholder.svg") || post.imageUrl?.includes("placeholder.svg")) {
                             return (
@@ -545,16 +460,6 @@ export default function GenerateVideo({ posts, onComplete, onBack }: GenerateVid
                           )
                         }
                       })()
-                    ) : post.imageUrl && !post.imageUrl.includes("placeholder.svg") ? (
-                      // Single image from imageUrl
-                      <div className="relative h-24 border-2 border-gray-200 rounded-md overflow-hidden">
-                        <Image
-                          src={post.imageUrl || "/placeholder.svg"}
-                          alt="Post image"
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
                     ) : (
                       // No images data at all
                       <div className="col-span-4 py-3 text-center text-gray-500 border-2 border-dashed border-gray-300 rounded-md">
