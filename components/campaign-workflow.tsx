@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import CreateCampaign from "./steps/create-campaign"
 import GenerateSelectTheme from "./steps/generate-select-theme"
 import GenerateApproveContent from "./steps/generate-approve-content"
+import GenerateMultipleImages from "./steps/generate-multiple-images"
 import GenerateVideo from "./steps/generate-video"
 import ReviewPosts from "./steps/review-posts"
 import CompletionStep from "./steps/completion-step"
@@ -12,8 +13,6 @@ import WorkflowProgress from "./workflow-progress"
 import { useToast } from "@/hooks/use-toast"
 import { updateCampaignStep } from "@/lib/actions"
 import { getCampaignSteps } from "@/lib/campaign-steps"
-// First, add the import for the new component
-import GenerateMultipleImages from "./steps/generate-multiple-images"
 
 // Update the Campaign type to match the new schema
 export type Campaign = {
@@ -54,24 +53,13 @@ export type Post = {
   isScheduled?: boolean
   title?: string
   status?: string
+  images?: string
 }
 
 // Updated steps - added Video step between Images and Review
 const steps = ["New campaign", "Themes", "Content", "Images", "Video", "Review", "Schedule"]
 
-// Map UI steps to database steps - updated to include the new Video step
-const uiToDatabaseStepMap = {
-  0: 0, // New campaign -> 0
-  1: 2, // Themes -> 2 (Generate Theme + Select Theme)
-  2: 3, // Content -> 3 (Generate Post + Approve Post)
-  3: 4, // Images -> 4 (Generate Images)
-  4: 5, // Video -> 5 (Generate Video)
-  5: 6, // Review -> 6 (Review)
-  6: 7, // Schedule -> 7 (Completion)
-  // Step 8 is reserved for fully scheduled campaigns
-}
-
-// Map database steps to UI steps - this is the reverse mapping
+// Map database steps to UI steps
 const dbToUiStepMap = {
   0: 0, // New campaign -> 0
   1: 0, // Draft -> 0
@@ -80,8 +68,19 @@ const dbToUiStepMap = {
   4: 3, // Image Selection -> 3
   5: 4, // Video Selection -> 4
   6: 5, // Review -> 5
-  7: 6, // Completion -> 6
-  8: 6, // Scheduled -> 6 (still show completion step)
+  7: 6, // Completion -> 6 (Schedule step in UI)
+  8: 6, // Scheduled -> 6 (still show Schedule step)
+}
+
+// Map UI steps to database steps
+const uiToDatabaseStepMap = {
+  0: 0, // New campaign -> 0
+  1: 2, // Themes -> 2 (Generate Theme + Select Theme)
+  2: 3, // Content -> 3 (Generate Post + Approve Post)
+  3: 4, // Images -> 4 (Generate Images)
+  4: 5, // Video -> 5 (Generate Video)
+  5: 6, // Review -> 6 (Review)
+  6: 7, // Schedule -> 7 (Completion)
 }
 
 interface CampaignWorkflowProps {
@@ -99,7 +98,7 @@ interface CampaignWorkflowProps {
 }
 
 export default function CampaignWorkflow({ initialCampaign, initialStep = 0, initialData }: CampaignWorkflowProps) {
-  const [currentStep, setCurrentStep] = useState(initialStep)
+  const [currentStep, setCurrentStep] = useState(0)
   const [campaign, setCampaign] = useState<Campaign | null>(initialCampaign || initialData?.campaign || null)
   const [themes, setThemes] = useState<Theme[]>(initialData?.themes || [])
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(initialData?.selectedTheme || null)
@@ -113,7 +112,7 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
 
   // Set initial step based on prop
   useEffect(() => {
-    if (initialStep > 0) {
+    if (initialStep !== undefined) {
       // Map database step to UI step using the mapping object
       const uiStep = dbToUiStepMap[initialStep as keyof typeof dbToUiStepMap] || 0
       console.log(`Mapping database step ${initialStep} to UI step ${uiStep}`)
@@ -180,12 +179,14 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
 
   const handleApproveContent = (approvedPosts: Post[]) => {
     setSelectedPosts(approvedPosts)
+    setPosts(approvedPosts) // Also update the main posts array
     nextStep()
   }
 
   const handleGenerateImages = (updatedPosts: Post[]) => {
     // Store the posts with their image selection state
     setPostsWithImages(updatedPosts)
+    setPosts(updatedPosts) // Update the main posts array
 
     // Also update the selectedPosts array to maintain consistency when going back
     setSelectedPosts((prevSelectedPosts) => {
@@ -202,11 +203,13 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
 
   const handleGenerateVideos = (updatedPosts: Post[]) => {
     setPostsWithVideos(updatedPosts)
+    setPosts(updatedPosts) // Update the main posts array
     nextStep()
   }
 
   const handleReviewComplete = async (finalPosts: Post[]) => {
     setReviewedPosts(finalPosts)
+    setPosts(finalPosts) // Update the main posts array
 
     // Update to step 7 (Completion) when review is complete
     if (campaign?.id) {
@@ -268,6 +271,15 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
     setCurrentStep(5) // Go back to the Review step (index 5 in the updated steps array)
   }
 
+  // Determine which posts to use for the current step
+  const getPostsForCurrentStep = () => {
+    if (reviewedPosts.length > 0) return reviewedPosts
+    if (postsWithVideos.length > 0) return postsWithVideos
+    if (postsWithImages.length > 0) return postsWithImages
+    if (selectedPosts.length > 0) return selectedPosts
+    return posts
+  }
+
   return (
     <div
       className={`sm:bg-white sm:border-4 sm:border-black sm:rounded-lg sm:p-6 sm:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-2`}
@@ -284,7 +296,7 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
       >
         {currentStep === 0 && <CreateCampaign onSubmit={handleCreateCampaign} initialData={initialCampaign} />}
 
-        {currentStep === 1 && campaign && campaign.id && (
+        {currentStep === 1 && campaign && (
           <GenerateSelectTheme campaign={campaign} onThemeSelected={handleThemeSelected} onBack={prevStep} />
         )}
 
@@ -306,8 +318,13 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
           />
         )}
 
-        {currentStep === 4 && postsWithImages.length > 0 && (
-          <GenerateVideo posts={postsWithImages} onComplete={handleGenerateVideos} onBack={prevStep} />
+        {currentStep === 4 && (
+          <GenerateVideo
+            posts={postsWithImages.length > 0 ? postsWithImages : selectedPosts}
+            onComplete={handleGenerateVideos}
+            onBack={prevStep}
+            skipIfNoImages={true}
+          />
         )}
 
         {currentStep === 5 && (
@@ -322,9 +339,7 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
           <CompletionStep
             campaign={campaign}
             theme={selectedTheme}
-            posts={
-              reviewedPosts.length > 0 ? reviewedPosts : postsWithVideos.length > 0 ? postsWithVideos : postsWithImages
-            }
+            posts={getPostsForCurrentStep()}
             onScheduleComplete={handleScheduleComplete}
             onBack={handleBackToReview}
             isComplete={isWorkflowComplete}
@@ -332,6 +347,21 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
         )}
 
         {/* Show loading or error state if data is missing for the current step */}
+        {currentStep === 1 && !campaign && (
+          <div className="text-center p-8">
+            <p className="text-lg font-bold text-red-600">Missing campaign data</p>
+            <p className="text-gray-600 mt-2">
+              Campaign data is missing. Please go back to the previous step and create a campaign.
+            </p>
+            <button
+              onClick={prevStep}
+              className="mt-4 py-2 px-4 bg-yellow-300 border-2 border-black rounded-md font-medium"
+            >
+              Go Back
+            </button>
+          </div>
+        )}
+
         {currentStep === 2 && (!campaign || !selectedTheme) && (
           <div className="text-center p-8">
             <p className="text-lg font-bold text-red-600">Missing data for content step</p>
@@ -339,6 +369,21 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
               {!campaign && "Campaign data is missing. "}
               {!selectedTheme && "No theme has been selected. "}
               Please go back to the previous steps and complete them.
+            </p>
+            <button
+              onClick={prevStep}
+              className="mt-4 py-2 px-4 bg-yellow-300 border-2 border-black rounded-md font-medium"
+            >
+              Go Back
+            </button>
+          </div>
+        )}
+
+        {currentStep === 3 && (!selectedPosts || selectedPosts.length === 0) && (
+          <div className="text-center p-8">
+            <p className="text-lg font-bold text-red-600">Missing data for images step</p>
+            <p className="text-gray-600 mt-2">
+              No posts have been approved. Please go back to the previous step and approve some posts.
             </p>
             <button
               onClick={prevStep}
@@ -364,12 +409,13 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
           </div>
         )}
 
-        {currentStep === 6 && (!campaign || !selectedTheme) && (
+        {currentStep === 6 && (!campaign || !selectedTheme || getPostsForCurrentStep().length === 0) && (
           <div className="text-center p-8">
             <p className="text-lg font-bold text-red-600">Missing data for scheduling step</p>
             <p className="text-gray-600 mt-2">
               {!campaign && "Campaign data is missing. "}
               {!selectedTheme && "No theme has been selected. "}
+              {getPostsForCurrentStep().length === 0 && "No reviewed posts are available. "}
               Please go back to the previous steps and complete them.
             </p>
             <button

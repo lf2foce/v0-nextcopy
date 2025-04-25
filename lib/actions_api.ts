@@ -650,7 +650,8 @@ export async function processImageGeneration(
   imageService: string,
 ) {
   try {
-    console.log(
+    // Use debug level logging instead of info level
+    console.debug(
       `Processing image generation: ${numImages} images with style "${imageStyle}" using service "${imageService}" for post ${postId}`,
     )
 

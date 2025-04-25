@@ -13,7 +13,9 @@ export interface PostImage {
   }
 }
 
-// Update the isValidImageUrl function to be more strict
+// Reduce console logging for tinyurl warnings
+// Update the isValidImageUrl function:
+
 export function isValidImageUrl(url: string | undefined): boolean {
   if (!url) return false
 
@@ -25,9 +27,10 @@ export function isValidImageUrl(url: string | undefined): boolean {
   // Check for common URL patterns
   const isValidPattern = url.startsWith("http") || url.startsWith("/") || url.startsWith("data:image/")
 
-  // Additional check for tinyurl links that might be problematic
-  if (url.includes("tinyurl.com")) {
-    console.warn("Potentially problematic tinyurl detected:", url)
+  // Only log tinyurl warnings in development, not in production
+  if (url.includes("tinyurl.com") && process.env.NODE_ENV === "development") {
+    // Use console.debug instead of console.warn to reduce noise
+    console.debug("Potentially problematic tinyurl detected:", url)
   }
 
   return isValidPattern

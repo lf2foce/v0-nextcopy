@@ -97,9 +97,10 @@ interface GenerateVideoProps {
   posts: Post[]
   onComplete: (postsWithVideos: Post[]) => void
   onBack: () => void
+  skipIfNoImages?: boolean
 }
 
-export default function GenerateVideo({ posts, onComplete, onBack }: GenerateVideoProps) {
+export default function GenerateVideo({ posts, onComplete, onBack, skipIfNoImages = false }: GenerateVideoProps) {
   const [localPosts, setLocalPosts] = useState<Post[]>(posts)
   const [isGeneratingAll, setIsGeneratingAll] = useState(false)
   const [generatingPostId, setGeneratingPostId] = useState<string | number | null>(null)
@@ -108,6 +109,22 @@ export default function GenerateVideo({ posts, onComplete, onBack }: GenerateVid
   const [isFinalizing, setIsFinalizing] = useState(false)
   const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null)
   const { toast } = useToast()
+
+  // Check if any posts have images
+  const hasPostsWithImages = posts.some((post) => {
+    if (post.images) {
+      try {
+        const imagesData = JSON.parse(post.images)
+        const images = imagesData.images || []
+        return images.some((img: any) => img.isSelected && !img.url?.includes("placeholder"))
+      } catch (e) {
+        return false
+      }
+    }
+    return (
+      (post.image && !post.image.includes("placeholder")) || (post.imageUrl && !post.imageUrl.includes("placeholder"))
+    )
+  })
 
   // Progress interval reference
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -337,6 +354,29 @@ export default function GenerateVideo({ posts, onComplete, onBack }: GenerateVid
         <p className="text-gray-700">Create videos for your posts based on their content and images</p>
       </div>
 
+      {!hasPostsWithImages && (
+        <div className="bg-yellow-100 border-4 border-black rounded-md p-6 text-center">
+          <p className="text-lg font-bold mb-2">No posts with images available</p>
+          <p className="mb-4">You can continue without generating videos, or go back to add images first.</p>
+          {skipIfNoImages && (
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={onBack}
+                className="py-2 px-4 bg-gray-200 border-2 border-black rounded-md font-medium hover:bg-gray-300"
+              >
+                Back to Images
+              </button>
+              <button
+                onClick={() => onComplete(localPosts)}
+                className="py-2 px-4 bg-green-400 border-2 border-black rounded-md font-medium hover:bg-green-500"
+              >
+                Skip to Next Step
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {isGeneratingAll && (
         <div className="bg-gray-100 border-4 border-black rounded-md p-4">
           <div className="flex items-center justify-between mb-2">
@@ -352,8 +392,8 @@ export default function GenerateVideo({ posts, onComplete, onBack }: GenerateVid
         </div>
       )}
 
-      {/* Always show the Generate All Videos button when not generating */}
-      {!isGeneratingAll && (
+      {/* Only show the Generate All Videos button when not generating and we have posts with images */}
+      {!isGeneratingAll && hasPostsWithImages && (
         <div className="flex justify-center mb-4">
           <button
             onClick={generateAllVideos}

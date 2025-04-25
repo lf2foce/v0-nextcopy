@@ -27,6 +27,11 @@ interface CampaignWorkflowProps {
 
 export default function CampaignWorkflow({ initialCampaign, initialStep = 0, initialData }: CampaignWorkflowProps) {
   const [currentStep, setCurrentStep] = useState(initialStep)
+  const [postsWithImages, setPostsWithImages] = useState<Post[] | undefined>(initialData?.postsWithImages)
+
+  const prevStep = () => {
+    setCurrentStep((prev) => Math.max(0, prev - 1))
+  }
 
   return (
     <div>
@@ -63,16 +68,36 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
       {currentStep === 3 && (
         <GenerateImages
           posts={[]}
-          onComplete={(postsWithImages) => {
-            console.log("Images generated:", postsWithImages)
+          onComplete={(newPostsWithImages) => {
+            console.log("Images generated:", newPostsWithImages)
+            setPostsWithImages(newPostsWithImages)
             setCurrentStep(4)
           }}
           onBack={() => setCurrentStep(2)}
         />
       )}
+      {currentStep === 4 && (!postsWithImages || postsWithImages.length === 0) && (
+        <div className="text-center p-8">
+          <p className="text-lg font-bold text-yellow-600">No posts with images available</p>
+          <p className="text-gray-600 mt-2">
+            You can continue without generating videos, or go back to add images first.
+          </p>
+          <div className="flex justify-center gap-4 mt-4">
+            <button onClick={prevStep} className="py-2 px-4 bg-yellow-300 border-2 border-black rounded-md font-medium">
+              Go Back to Images
+            </button>
+            <button
+              onClick={() => setCurrentStep(5)}
+              className="py-2 px-4 bg-green-400 border-2 border-black rounded-md font-medium"
+            >
+              Skip to Review
+            </button>
+          </div>
+        </div>
+      )}
       {currentStep === 4 && (
         <GenerateVideo
-          posts={[]}
+          posts={initialData?.posts || []}
           onComplete={(postsWithVideos) => {
             console.log("Videos generated:", postsWithVideos)
             setCurrentStep(5)

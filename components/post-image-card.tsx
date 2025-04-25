@@ -147,6 +147,11 @@ export default function PostImageCard({
     }))
   }
 
+  // Log when numImages changes
+  useEffect(() => {
+    console.debug(`Post ${post.id}: Number of images set to ${numImages}`)
+  }, [numImages, post.id])
+
   return (
     <div className="border-4 border-black rounded-md overflow-hidden bg-white">
       <div className="p-4 bg-yellow-100 border-b-4 border-black">

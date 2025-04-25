@@ -823,7 +823,11 @@ export default function GenerateMultipleImages({
           await clearPostImages(post.id, placeholderImages)
         }
 
-        // Generate images
+        // Add this before calling handleGenerateImages:
+        const numImages = numImagesPerPost[post.id] || 1
+        console.log(`Generating ${numImages} images for post ${post.id}`)
+
+        // Then call handleGenerateImages with the post ID
         const result = await handleGenerateImages(post.id)
 
         if (result.success) {

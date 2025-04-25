@@ -14,9 +14,7 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
     const imageStyle = searchParams.get("style") || "realistic"
     const imageService = searchParams.get("image_service") || "flux" // Add image service parameter with default
 
-    console.log(
-      `API route: Generating ${numImages} images with style "${imageStyle}" using service "${imageService}" for post ${postId}`,
-    )
+    console.debug(`Generating images for post ${postId}: ${numImages} ${imageStyle} images via ${imageService}`)
 
     // Call the FastAPI backend
     const fastApiUrl = process.env.FASTAPI_URL
@@ -29,7 +27,7 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
 
     // Log the URL we're calling for debugging
     const endpoint = `${fastApiUrl}/content/${postId}/generate_images_real?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}&image_service=${encodeURIComponent(imageService)}`
-    console.log(`Calling FastAPI endpoint: ${endpoint}`)
+    console.debug(`FastAPI endpoint: ${endpoint}`)
 
     try {
       const response = await fetch(endpoint, {
@@ -41,7 +39,7 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
       })
 
       // Log the response status
-      console.log(`FastAPI response status: ${response.status}`)
+      console.debug(`FastAPI response: ${response.status}`)
 
       // If response is not ok, handle it properly
       if (!response.ok) {
@@ -70,7 +68,7 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
       // Parse the successful response
       try {
         const data = await response.json()
-        console.log("FastAPI success response:", data)
+        console.debug("FastAPI success response received")
 
         // Check if this is a processing response (async generation started)
         if (data.status === "processing" || data.message?.includes("background")) {

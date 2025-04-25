@@ -140,19 +140,6 @@ export async function updatePostImages(postsToUpdate: { id: number; image: strin
   }
 }
 
-// Generate posts
-export async function generatePosts(campaignId: number, themeId: number, postsData: any[]) {
-  try {
-    console.log("Generating posts for theme:", themeId)
-
-    revalidatePath("/campaigns")
-    return { success: true, data: postsData }
-  } catch (error) {
-    console.error("Failed to generate posts:", error)
-    return { success: false, error: "Failed to generate posts" }
-  }
-}
-
 // Update post videos
 export async function updatePostVideos(postsToUpdate: { id: number; video: string }[]) {
   try {

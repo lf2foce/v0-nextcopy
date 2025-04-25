@@ -3,7 +3,6 @@
 import { useState } from "react"
 import type { Campaign, Theme, Post } from "../campaign-workflow"
 import { Loader2 } from "lucide-react"
-import { generatePosts } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
 
 interface GeneratePostProps {
@@ -81,22 +80,14 @@ export default function GeneratePost({ campaign, theme, onGenerate, onBack }: Ge
       // Generate posts based on the selected theme
       const themePosts = generateThemeBasedPosts(campaign, theme)
 
-      // Call the API to save the posts
-      const result = await generatePosts(campaign.id, theme.id, themePosts)
+      // No need to call an API - we're generating the posts directly
+      toast({
+        title: "Posts generated",
+        description: "Your posts have been generated successfully.",
+      })
 
-      if (result.success) {
-        toast({
-          title: "Posts generated",
-          description: "Your posts have been generated successfully.",
-        })
-        onGenerate(result.data)
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to generate posts",
-          variant: "destructive",
-        })
-      }
+      // Pass the generated posts directly to the parent component
+      onGenerate(themePosts)
     } catch (error) {
       toast({
         title: "Error",

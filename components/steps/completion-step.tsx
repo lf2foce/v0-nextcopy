@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import type { Campaign, Theme, Post } from "../campaign-workflow"
@@ -14,12 +14,25 @@ interface CompletionStepProps {
   posts: Post[]
   onScheduleComplete: () => void
   onBack: () => void
+  isComplete?: boolean
 }
 
-export default function CompletionStep({ campaign, theme, posts, onScheduleComplete, onBack }: CompletionStepProps) {
-  const [isScheduled, setIsScheduled] = useState(false)
+export default function CompletionStep({
+  campaign,
+  theme,
+  posts,
+  onScheduleComplete,
+  onBack,
+  isComplete = false,
+}: CompletionStepProps) {
+  const [isScheduled, setIsScheduled] = useState(isComplete)
   const [showScheduleAnimation, setShowScheduleAnimation] = useState(false)
   const { toast } = useToast()
+
+  // If isComplete prop changes, update isScheduled state
+  useEffect(() => {
+    setIsScheduled(isComplete)
+  }, [isComplete])
 
   const handleSchedulePosts = async () => {
     setShowScheduleAnimation(true)
@@ -134,28 +147,34 @@ export default function CompletionStep({ campaign, theme, posts, onScheduleCompl
               {isScheduled ? "Scheduled Posts" : "Posts with Generated Images"} ({posts.length})
             </h4>
             <div className="space-y-4 mt-2">
-              {posts.map((post) => (
-                <div key={post.id} className="border-2 border-black rounded-md p-4 bg-gray-50">
-                  <div className="flex flex-col md:flex-row gap-4">
-                    <div className="w-full md:w-1/3 relative h-48 md:h-auto">
-                      <Image
-                        src={post.image || post.imageUrl || "/placeholder.svg"}
-                        alt="Post preview"
-                        fill
-                        className="object-cover rounded-md"
-                      />
-                      {isScheduled && (
-                        <div className="absolute top-2 right-2 bg-green-400 rounded-full p-1 border-2 border-black">
-                          <CheckCircle size={20} className="text-black" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-lg">{post.content}</p>
+              {posts.length > 0 ? (
+                posts.map((post) => (
+                  <div key={post.id} className="border-2 border-black rounded-md p-4 bg-gray-50">
+                    <div className="flex flex-col md:flex-row gap-4">
+                      <div className="w-full md:w-1/3 relative h-48 md:h-auto">
+                        <Image
+                          src={post.image || post.imageUrl || "/placeholder.svg"}
+                          alt="Post preview"
+                          fill
+                          className="object-cover rounded-md"
+                        />
+                        {isScheduled && (
+                          <div className="absolute top-2 right-2 bg-green-400 rounded-full p-1 border-2 border-black">
+                            <CheckCircle size={20} className="text-black" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-lg">{post.content}</p>
+                      </div>
                     </div>
                   </div>
+                ))
+              ) : (
+                <div className="text-center p-4 border-2 border-dashed border-gray-300 rounded-md">
+                  <p className="text-gray-500">No posts available to display</p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
@@ -168,12 +187,12 @@ export default function CompletionStep({ campaign, theme, posts, onScheduleCompl
               onClick={onBack}
               className="py-3 px-6 bg-white border-4 border-black rounded-md font-bold text-lg hover:bg-gray-100 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
             >
-              Back to Images
+              Back to Review
             </button>
 
             <button
               onClick={handleSchedulePosts}
-              disabled={showScheduleAnimation}
+              disabled={showScheduleAnimation || posts.length === 0}
               className="py-3 px-6 bg-yellow-300 border-4 border-black rounded-md font-bold text-lg hover:bg-yellow-400 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2 disabled:opacity-70"
             >
               {showScheduleAnimation ? (
