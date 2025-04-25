@@ -6,7 +6,6 @@ import type { Post } from "../campaign-workflow"
 import { CheckCircle, RefreshCw, Edit, Save, Loader2, X, Eye, Play, Check } from "lucide-react"
 import { updatePostContent, updatePostImages, updatePostVideos, completeReview } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
-// First, import the new ImageViewerModal component
 import ImageViewerModal from "../ui/image-viewer-modal"
 
 interface ReviewPostsProps {
@@ -117,9 +116,7 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
   const [regeneratingVideoId, setRegeneratingVideoId] = useState<string | number | null>(null)
   const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null)
   const { toast } = useToast()
-  // First, add a new state for the finalize loading state
   const [isFinalizing, setIsFinalizing] = useState(false)
-  // Add a new state for the image viewer modal
   const [viewerImages, setViewerImages] = useState<any[]>([])
   const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0)
@@ -400,7 +397,7 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
     setVideoModalUrl(videoUrl)
   }
 
-  // Then update the handleComplete function to include loading state
+  // Improved handleComplete function that waits for database update
   const handleComplete = async () => {
     setIsFinalizing(true)
 
@@ -414,15 +411,25 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
         const result = await completeReview(campaignId)
 
         if (!result.success) {
-          throw new Error(result.error || "Failed to update campaign step")
+          console.error("Error completing review:", result.error)
+          toast({
+            title: "Error",
+            description: "Failed to update database. Please try again.",
+            variant: "destructive",
+          })
+          setIsFinalizing(false)
+          return
         }
 
         // Only proceed if database update was successful
         console.log("Database update successful, proceeding to next step")
-      }
 
-      // Call onComplete with the posts
-      onComplete(localPosts)
+        // Call onComplete with the posts - only after successful database update
+        onComplete(localPosts)
+      } else {
+        // If no campaign ID, just call onComplete
+        onComplete(localPosts)
+      }
     } catch (error) {
       console.error("Error finalizing review:", error)
       toast({
@@ -743,13 +750,17 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
         <button
           onClick={onBack}
           disabled={
-            isSubmitting || !!regeneratingPostId || !!regeneratingImageId || !!editingPostId || !!regeneratingVideoId
+            isSubmitting ||
+            !!regeneratingPostId ||
+            !!regeneratingImageId ||
+            !!editingPostId ||
+            !!regeneratingVideoId ||
+            isFinalizing
           }
           className="py-3 px-6 bg-white border-4 border-black rounded-md font-bold text-lg hover:bg-gray-100 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:opacity-70"
         >
           Back
         </button>
-        {/* Finally, update the Finalize button to show loading state */}
         <button
           onClick={handleComplete}
           disabled={
