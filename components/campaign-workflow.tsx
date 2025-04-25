@@ -10,7 +10,9 @@ import ReviewPosts from "./steps/review-posts"
 import CompletionStep from "./steps/completion-step"
 import WorkflowProgress from "./workflow-progress"
 import { useToast } from "@/hooks/use-toast"
-import { updateCampaignStep, getCampaignSteps } from "@/lib/actions_api"
+import { updateCampaignStep } from "@/lib/actions"
+import { getCampaignSteps } from "@/lib/campaign-steps"
+// First, add the import for the new component
 import GenerateMultipleImages from "./steps/generate-multiple-images"
 
 // Update the Campaign type to match the new schema
@@ -69,6 +71,19 @@ const uiToDatabaseStepMap = {
   // Step 8 is reserved for fully scheduled campaigns
 }
 
+// Map database steps to UI steps - this is the reverse mapping
+const dbToUiStepMap = {
+  0: 0, // New campaign -> 0
+  1: 0, // Draft -> 0
+  2: 1, // Theme Selection -> 1
+  3: 2, // Content Creation -> 2
+  4: 3, // Image Selection -> 3
+  5: 4, // Video Selection -> 4
+  6: 5, // Review -> 5
+  7: 6, // Completion -> 6
+  8: 6, // Scheduled -> 6 (still show completion step)
+}
+
 interface CampaignWorkflowProps {
   initialCampaign?: Campaign
   initialStep?: number
@@ -99,34 +114,15 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   // Set initial step based on prop
   useEffect(() => {
     if (initialStep > 0) {
-      // Map database step to UI step
-      let uiStep = initialStep
-
-      // Handle special cases
-      if (initialStep === 8) {
-        // If campaign is fully scheduled (step 8), show completion step
-        uiStep = 6
-      } else if (initialStep === 7) {
-        // If at completion step (7), show completion step
-        uiStep = 6
-      } else if (initialStep === 6) {
-        // If at review step (6), show review step
-        uiStep = 5
-      } else if (initialStep === 5) {
-        // If at generate video step (5), show video step
-        uiStep = 4
-      } else if (initialStep === 4) {
-        // If at generate images step (4), show images step
-        uiStep = 3
-      } else if (initialStep === 3) {
-        // If at generate/approve post step (3), show content step
-        uiStep = 2
-      } else if (initialStep === 2) {
-        // If at generate/select theme step (2), show themes step
-        uiStep = 1
-      }
-
+      // Map database step to UI step using the mapping object
+      const uiStep = dbToUiStepMap[initialStep as keyof typeof dbToUiStepMap] || 0
+      console.log(`Mapping database step ${initialStep} to UI step ${uiStep}`)
       setCurrentStep(uiStep)
+
+      // If we're at step 7 (Completion) or 8 (Scheduled), we should initialize as complete
+      if (initialStep >= 7) {
+        setIsWorkflowComplete(true)
+      }
     }
   }, [initialStep])
 
@@ -134,7 +130,6 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   useEffect(() => {
     if (initialData) {
       console.log("Initial data received:", initialData)
-      console.log("Posts with videos:", initialData.postsWithVideos)
     }
   }, [initialData])
 
@@ -216,8 +211,8 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
     // Update to step 7 (Completion) when review is complete
     if (campaign?.id) {
       try {
-        const steps = await getCampaignSteps()
-        await updateCampaignStep(campaign.id, steps.COMPLETION) // Now using 7 instead of 8
+        const CAMPAIGN_STEPS = await getCampaignSteps()
+        await updateCampaignStep(campaign.id, CAMPAIGN_STEPS.COMPLETION) // Now using 7 instead of 8
       } catch (error) {
         console.error("Failed to update campaign step:", error)
       }
@@ -232,9 +227,9 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
     // Update to step 8 (SCHEDULED) when scheduling is complete
     if (campaign?.id) {
       try {
-        const steps = await getCampaignSteps()
-        console.log("Updating campaign to SCHEDULED step:", steps.SCHEDULED)
-        const result = await updateCampaignStep(campaign.id, steps.SCHEDULED)
+        const CAMPAIGN_STEPS = await getCampaignSteps()
+        console.log("Updating campaign to SCHEDULED step:", CAMPAIGN_STEPS.SCHEDULED)
+        const result = await updateCampaignStep(campaign.id, CAMPAIGN_STEPS.SCHEDULED)
         console.log("Update campaign step result:", result)
 
         if (result.success) {
@@ -311,35 +306,28 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
           />
         )}
 
-        {currentStep === 4 && (
-          <GenerateVideo
-            posts={postsWithImages.length > 0 ? postsWithImages : selectedPosts}
-            onComplete={handleGenerateVideos}
-            onBack={prevStep}
-          />
+        {currentStep === 4 && postsWithImages.length > 0 && (
+          <GenerateVideo posts={postsWithImages} onComplete={handleGenerateVideos} onBack={prevStep} />
         )}
 
         {currentStep === 5 && (
           <ReviewPosts
-            posts={
-              postsWithVideos.length > 0
-                ? postsWithVideos
-                : postsWithImages.length > 0
-                  ? postsWithImages
-                  : selectedPosts
-            }
+            posts={postsWithVideos.length > 0 ? postsWithVideos : postsWithImages}
             onComplete={handleReviewComplete}
             onBack={prevStep}
           />
         )}
 
-        {currentStep === 6 && campaign && selectedTheme && reviewedPosts.length > 0 && (
+        {currentStep === 6 && campaign && selectedTheme && (
           <CompletionStep
             campaign={campaign}
             theme={selectedTheme}
-            posts={reviewedPosts}
+            posts={
+              reviewedPosts.length > 0 ? reviewedPosts : postsWithVideos.length > 0 ? postsWithVideos : postsWithImages
+            }
             onScheduleComplete={handleScheduleComplete}
             onBack={handleBackToReview}
+            isComplete={isWorkflowComplete}
           />
         )}
 
@@ -361,31 +349,27 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
           </div>
         )}
 
-        {currentStep === 5 &&
-          (!postsWithImages || postsWithImages.length === 0) &&
-          (!postsWithVideos || postsWithVideos.length === 0) &&
-          (!selectedPosts || selectedPosts.length === 0) && (
-            <div className="text-center p-8">
-              <p className="text-lg font-bold text-red-600">Missing data for review step</p>
-              <p className="text-gray-600 mt-2">
-                No posts with content are available. Please go back to the previous steps and generate content first.
-              </p>
-              <button
-                onClick={prevStep}
-                className="mt-4 py-2 px-4 bg-yellow-300 border-2 border-black rounded-md font-medium"
-              >
-                Go Back
-              </button>
-            </div>
-          )}
+        {currentStep === 5 && (!postsWithImages || postsWithImages.length === 0) && (
+          <div className="text-center p-8">
+            <p className="text-lg font-bold text-red-600">Missing data for review step</p>
+            <p className="text-gray-600 mt-2">
+              No posts with images are available. Please go back to the previous steps and generate images first.
+            </p>
+            <button
+              onClick={prevStep}
+              className="mt-4 py-2 px-4 bg-yellow-300 border-2 border-black rounded-md font-medium"
+            >
+              Go Back
+            </button>
+          </div>
+        )}
 
-        {currentStep === 6 && (!campaign || !selectedTheme || reviewedPosts.length === 0) && (
+        {currentStep === 6 && (!campaign || !selectedTheme) && (
           <div className="text-center p-8">
             <p className="text-lg font-bold text-red-600">Missing data for scheduling step</p>
             <p className="text-gray-600 mt-2">
               {!campaign && "Campaign data is missing. "}
               {!selectedTheme && "No theme has been selected. "}
-              {reviewedPosts.length === 0 && "No reviewed posts are available. "}
               Please go back to the previous steps and complete them.
             </p>
             <button

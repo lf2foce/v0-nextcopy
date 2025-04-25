@@ -5,6 +5,18 @@ import { themes, contentPosts, campaigns } from "./schema"
 import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 
+// Define campaign steps
+const CAMPAIGN_STEPS = {
+  DRAFT: 1,
+  THEME_SELECTION: 2,
+  CONTENT_CREATION: 3,
+  IMAGE_SELECTION: 4,
+  VIDEO_SELECTION: 5,
+  SCHEDULING: 6,
+  REVIEW: 7,
+  SCHEDULED: 8,
+}
+
 // Create a new campaign
 export async function createCampaign(formData: any) {
   try {
@@ -313,5 +325,39 @@ export async function selectTheme() {
   return {
     success: false,
     error: "selectTheme is not implemented",
+  }
+}
+
+// Update campaign step
+export async function updateCampaignStep(campaignId: number, step: number) {
+  try {
+    console.log(`Updating campaign ${campaignId} to step ${step}`)
+
+    // Update both currentStep and status if needed
+    let status = "draft"
+    if (step === CAMPAIGN_STEPS.SCHEDULED) {
+      status = "active" // Only set to active when fully scheduled (step 8)
+    }
+
+    const [updatedCampaign] = await db
+      .update(campaigns)
+      .set({
+        currentStep: step,
+        status: status,
+      })
+      .where(eq(campaigns.id, campaignId))
+      .returning()
+
+    // Revalidate both the campaigns list and the specific campaign page
+    revalidatePath("/campaigns")
+    revalidatePath(`/campaigns/${campaignId}`)
+
+    return { success: true, data: updatedCampaign }
+  } catch (error) {
+    console.error("Failed to update campaign step:", error)
+    return {
+      success: false,
+      error: "Failed to update campaign step: " + (error instanceof Error ? error.message : String(error)),
+    }
   }
 }

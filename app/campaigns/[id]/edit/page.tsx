@@ -56,14 +56,22 @@ export default async function EditCampaignPage({
         initialData.selectedPosts = fullCampaignResult.data.approvedPosts
       }
 
-      // Add posts with images if available (for step 6)
+      // Add posts with images if available
       if (fullCampaignResult.data.postsWithImages?.length > 0) {
         initialData.postsWithImages = fullCampaignResult.data.postsWithImages
       }
+
+      // Add posts with videos if available
+      if (fullCampaignResult.data.postsWithVideos?.length > 0) {
+        initialData.postsWithVideos = fullCampaignResult.data.postsWithVideos
+      }
     }
 
-    // If the campaign is at step 7 (scheduled), we should still show step 6 (completion) when editing
-    const displayStep = campaignResult.data.currentStep === 7 ? 6 : campaignResult.data.currentStep || 0
+    // Log the campaign step for debugging
+    console.log(`Campaign ${campaignId} is at step ${campaignResult.data.currentStep}`)
+
+    // Use the actual campaign step directly - our mapping will handle it correctly
+    const displayStep = campaignResult.data.currentStep || 0
 
     return (
       <CampaignEditClient initialCampaign={campaignResult.data} initialStep={displayStep} initialData={initialData} />
