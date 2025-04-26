@@ -100,9 +100,14 @@ export async function schedulePosts(postIds: number[]) {
 
     // Get the campaign ID from the first post
     if (postIds.length > 0) {
-      const post = await db.query.contentPosts.findFirst({
-        where: eq(contentPosts.id, postIds[0]),
-      })
+      // Use standard Drizzle query instead of query API
+      const posts = await db
+        .select({ campaignId: contentPosts.campaignId })
+        .from(contentPosts)
+        .where(eq(contentPosts.id, postIds[0]))
+        .limit(1)
+
+      const post = posts[0]
 
       if (post && post.campaignId) {
         // Update the campaign to step 8 (SCHEDULED) and status to "active"
@@ -128,7 +133,10 @@ export async function schedulePosts(postIds: number[]) {
     return { success: true }
   } catch (error) {
     console.error("Failed to schedule posts:", error)
-    return { success: false, error: "Failed to schedule posts" }
+    return {
+      success: false,
+      error: "Failed to schedule posts: " + (error instanceof Error ? error.message : String(error)),
+    }
   }
 }
 

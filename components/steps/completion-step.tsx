@@ -26,13 +26,13 @@ export default function CompletionStep({
   isComplete = false,
 }: CompletionStepProps) {
   // Only consider it scheduled if we're explicitly at step 8
-  const [isScheduled, setIsScheduled] = useState(isComplete && campaign.currentStep === 8)
+  const [isScheduled, setIsScheduled] = useState(isComplete || campaign.currentStep === 8)
   const [showScheduleAnimation, setShowScheduleAnimation] = useState(false)
   const { toast } = useToast()
 
   // If isComplete prop changes, update isScheduled state
   useEffect(() => {
-    setIsScheduled(isComplete && campaign.currentStep === 8)
+    setIsScheduled(isComplete || campaign.currentStep === 8)
   }, [isComplete, campaign.currentStep])
 
   const handleSchedulePosts = async () => {
@@ -182,7 +182,7 @@ export default function CompletionStep({
       </div>
 
       <div className="flex flex-wrap justify-center gap-4">
-        {!isScheduled && (
+        {!isScheduled ? (
           <>
             <button
               onClick={onBack}
@@ -209,6 +209,14 @@ export default function CompletionStep({
               )}
             </button>
           </>
+        ) : (
+          <Link
+            href={`/campaigns/${campaign.id}`}
+            className="py-3 px-6 bg-green-400 border-4 border-black rounded-md font-bold text-lg hover:bg-green-500 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2"
+          >
+            <Calendar size={20} />
+            View Campaign
+          </Link>
         )}
 
         <Link

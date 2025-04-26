@@ -225,6 +225,7 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   }
 
   const handleScheduleComplete = async () => {
+    // Immediately set workflow as complete to update UI
     setIsWorkflowComplete(true)
 
     // Update to step 8 (SCHEDULED) when scheduling is complete
@@ -236,6 +237,14 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
         console.log("Update campaign step result:", result)
 
         if (result.success) {
+          // Also update the local campaign object to reflect the new step
+          if (campaign) {
+            setCampaign({
+              ...campaign,
+              currentStep: CAMPAIGN_STEPS.SCHEDULED,
+            })
+          }
+
           toast({
             title: "Campaign Scheduled",
             description: "Your campaign has been successfully scheduled and is ready to go!",
