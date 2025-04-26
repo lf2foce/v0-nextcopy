@@ -90,8 +90,8 @@ export default function CampaignDetailClient({ initialCampaign }: { initialCampa
   // Get the selected theme
   const selectedTheme = campaign.selectedTheme || {}
 
-  // Get posts with images
-  const postsWithContent = campaign.postsWithImages || campaign.approvedPosts || []
+  // Get posts with content - prioritize approved posts, then posts with images
+  const postsWithContent = campaign.approvedPosts?.length ? campaign.approvedPosts : campaign.postsWithImages || []
 
   // Calculate total posts count
   const totalPosts = postsWithContent.length
@@ -228,14 +228,18 @@ export default function CampaignDetailClient({ initialCampaign }: { initialCampa
                 {postsWithContent.slice(0, 2).map((post: any, index: number) => (
                   <div key={post.id} className="border-2 border-black rounded-md overflow-hidden">
                     <div className="flex flex-col md:flex-row">
-                      <div className="w-full md:w-1/3 relative h-64 md:h-auto">
-                        <Image
-                          src={post.image || post.imageUrl || "/placeholder.svg"}
-                          alt="Post preview"
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
+                      {post.image || post.imageUrl ? (
+                        <div className="w-full md:w-1/3 relative h-64 md:h-auto">
+                          <Image src={post.image || post.imageUrl} alt="Post preview" fill className="object-cover" />
+                        </div>
+                      ) : (
+                        <div className="w-full md:w-1/3 bg-gray-100 flex items-center justify-center relative h-64 md:h-auto">
+                          <div className="text-gray-500 text-center p-4">
+                            <FileText size={48} className="mx-auto mb-2" />
+                            <p>Text-only post</p>
+                          </div>
+                        </div>
+                      )}
                       <div className="p-4 flex-1 relative">
                         {post.status === "scheduled" && (
                           <div className="absolute top-4 right-4">
@@ -296,7 +300,7 @@ export default function CampaignDetailClient({ initialCampaign }: { initialCampa
               </div>
             ) : (
               <div className="bg-gray-100 border-4 border-black rounded-lg p-6 text-center">
-                <p className="text-gray-700">No content has been generated for this campaign yet.</p>
+                <p className="text-gray-700">No approved content is available for this campaign yet.</p>
               </div>
             )}
           </div>
