@@ -98,8 +98,31 @@ export async function schedulePosts(postIds: number[]) {
   try {
     console.log("Scheduling posts with IDs:", postIds)
 
+    // Get the campaign ID from the first post
+    if (postIds.length > 0) {
+      const post = await db.query.contentPosts.findFirst({
+        where: eq(contentPosts.id, postIds[0]),
+      })
+
+      if (post && post.campaignId) {
+        // Update the campaign to step 8 (SCHEDULED) and status to "active"
+        await db
+          .update(campaigns)
+          .set({
+            currentStep: 8, // SCHEDULED step
+            status: "active",
+          })
+          .where(eq(campaigns.id, post.campaignId))
+
+        // Revalidate the campaign page
+        revalidatePath(`/campaigns/${post.campaignId}`)
+      }
+    }
+
     // Update posts to scheduled status
-    await db.update(contentPosts).set({ status: "scheduled" }).where(eq(contentPosts.id, postIds[0])) // Fix: Use eq for single ID
+    for (const postId of postIds) {
+      await db.update(contentPosts).set({ status: "scheduled" }).where(eq(contentPosts.id, postId))
+    }
 
     revalidatePath("/campaigns")
     return { success: true }

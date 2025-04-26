@@ -25,14 +25,15 @@ export default function CompletionStep({
   onBack,
   isComplete = false,
 }: CompletionStepProps) {
-  const [isScheduled, setIsScheduled] = useState(isComplete)
+  // Only consider it scheduled if we're explicitly at step 8
+  const [isScheduled, setIsScheduled] = useState(isComplete && campaign.currentStep === 8)
   const [showScheduleAnimation, setShowScheduleAnimation] = useState(false)
   const { toast } = useToast()
 
   // If isComplete prop changes, update isScheduled state
   useEffect(() => {
-    setIsScheduled(isComplete)
-  }, [isComplete])
+    setIsScheduled(isComplete && campaign.currentStep === 8)
+  }, [isComplete, campaign.currentStep])
 
   const handleSchedulePosts = async () => {
     setShowScheduleAnimation(true)

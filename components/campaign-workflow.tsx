@@ -118,8 +118,8 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
       console.log(`Mapping database step ${initialStep} to UI step ${uiStep}`)
       setCurrentStep(uiStep)
 
-      // If we're at step 7 (Completion) or 8 (Scheduled), we should initialize as complete
-      if (initialStep >= 7) {
+      // Only set as complete if we're at step 8 (SCHEDULED)
+      if (initialStep === 8) {
         setIsWorkflowComplete(true)
       }
     }
