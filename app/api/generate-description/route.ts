@@ -12,7 +12,7 @@ export async function POST(request: Request) {
 
     const { existingDescription } = body
 
-  // Default User Prompt (if no existing description)
+    // Default User Prompt (if no existing description)
     const defaultPrompt = `
 Chiến dịch mô tả:
 
@@ -52,8 +52,6 @@ Mandatory: You must naturally cover every provided point in the final descriptio
 
 Ví dụ đầu ra: "${defaultPrompt}"
 `
-
-    
 
     // Improve Prompt (if there's an existing description)
     const improvePrompt = (description: string) => `
