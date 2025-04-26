@@ -1,12 +1,12 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import type { Campaign } from "../campaign-workflow"
 import { createCampaign } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, AlertCircle } from "lucide-react"
+import { Loader2, AlertCircle, Sparkles } from "lucide-react"
 
 // Template data - in a real app, this would come from a database
 const templates = [
@@ -48,10 +48,34 @@ const templates = [
   },
 ]
 
+// Sample descriptions for when there's no existing content
+const sampleDescriptions = [
+  "This campaign aims to boost brand awareness and drive engagement through targeted content.",
+  "A strategic marketing initiative designed to increase conversions and customer loyalty.",
+  "An innovative approach to reaching new audiences while strengthening relationships with existing customers.",
+  "A data-driven campaign focused on maximizing ROI through personalized customer experiences.",
+]
+
+// Fallback descriptions in case the API fails
+const fallbackDescriptions = [
+  "A dynamic marketing campaign designed to captivate audiences through compelling visuals and messaging that resonates with their core values and interests.",
+  "An engaging promotional initiative targeting customers with personalized content that addresses their specific needs and pain points.",
+  "A strategic campaign crafted to build brand awareness by showcasing our unique value proposition through multiple touchpoints.",
+  "A conversion-focused campaign with clear calls-to-action and incentives tailored to customer preferences.",
+]
+
 // Update the Campaign type to match the new schema
 interface CreateCampaignProps {
   onSubmit: (data: Campaign) => void
   initialData?: Campaign
+}
+
+// Helper function to get tomorrow's date
+const getTomorrowDate = () => {
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  tomorrow.setHours(0, 0, 0, 0)
+  return tomorrow
 }
 
 export default function CreateCampaign({ onSubmit, initialData }: CreateCampaignProps) {
@@ -66,12 +90,17 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
     description: "",
     target: "",
     insight: "",
-    repeatEveryDays: 7,
-    startDate: new Date(new Date().setHours(0, 0, 0, 0)),
+    repeatEveryDays: 3, // Changed from 7 to 3
+    startDate: getTomorrowDate(), // Changed from today to tomorrow
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<(typeof templates)[0] | null>(null)
   const { toast } = useToast()
+  const [apiError, setApiError] = useState<string | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [fallbackDesc, setFallbackDesc] = useState<string>(
+    fallbackDescriptions[Math.floor(Math.random() * fallbackDescriptions.length)],
+  )
 
   // Initialize form with initial data if provided
   useEffect(() => {
@@ -83,8 +112,8 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
         description: initialData.description || "",
         target: initialData.target || initialData.targetCustomer || "",
         insight: initialData.insight || "",
-        repeatEveryDays: initialData.repeatEveryDays || 7,
-        startDate: initialData.startDate || new Date(),
+        repeatEveryDays: initialData.repeatEveryDays || 3, // Changed default from 7 to 3
+        startDate: initialData.startDate || getTomorrowDate(), // Changed from today to tomorrow
       })
     }
   }, [initialData])
@@ -117,7 +146,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
       // Mark this template as having shown the toast
       toastShownRef.current = templateId
     }
-  }, [templateId]) // Only depend on templateId, not toast or other changing values
+  }, [templateId, toast]) // Only depend on templateId, not toast or other changing values
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -142,6 +171,98 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
       ...prev,
       [name]: new Date(value),
     }))
+  }
+
+  const useFallback = useCallback(() => {
+    setFormData((prev) => ({
+      ...prev,
+      description: fallbackDesc,
+    }))
+    toast({
+      title: "Using fallback description",
+      description: "Could not connect to AI service. Using a fallback description instead.",
+      variant: "destructive",
+    })
+  }, [toast, fallbackDesc])
+
+  const generateDescription = async () => {
+    setIsGenerating(true)
+    setApiError(null)
+
+    // Use a fallback description right away if there's an API error
+
+    try {
+      console.log("Sending request to generate description", {
+        existingDescription: formData.description,
+      })
+
+      // Set a timeout to handle cases where the API takes too long
+      const timeoutId = setTimeout(() => {
+        if (isGenerating) {
+          setApiError("Request timed out")
+          useFallback()
+          setIsGenerating(false)
+        }
+      }, 10000) // 10 second timeout
+
+      try {
+        const response = await fetch("/api/generate-description", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            existingDescription: formData.description,
+          }),
+        })
+
+        // Clear the timeout since we got a response
+        clearTimeout(timeoutId)
+
+        // If we get a 500 error, use a fallback description
+        if (response.status === 500) {
+          console.error("Server error (500) when generating description")
+          setApiError("AI service unavailable")
+          useFallback()
+          return
+        }
+
+        // Check if response is ok before trying to parse JSON
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => "Unknown error")
+          throw new Error(`API returned ${response.status}: ${errorText.substring(0, 100)}`)
+        }
+
+        // Now safely parse JSON
+        const data = await response.json()
+
+        if (data.description) {
+          setFormData((prev) => ({
+            ...prev,
+            description: data.description,
+          }))
+          toast({
+            title: "Description generated",
+            description: "AI has created a description for your campaign.",
+          })
+        } else {
+          throw new Error("No description returned from API")
+        }
+      } catch (fetchError) {
+        // Clear the timeout if there was an error
+        clearTimeout(timeoutId)
+        throw fetchError
+      }
+    } catch (error) {
+      console.error("Error:", error)
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred"
+      setApiError(errorMessage)
+
+      // Use fallback description if API fails
+      useFallback()
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -220,6 +341,18 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
         </div>
       )}
 
+      {apiError && (
+        <div className="bg-red-100 border-4 border-black rounded-md p-4 mb-4">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-1" />
+            <div>
+              <h3 className="font-bold">API Error</h3>
+              <p className="text-sm">{apiError}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block font-bold mb-1" htmlFor="name">
@@ -241,16 +374,32 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
           <label className="block font-bold mb-1" htmlFor="description">
             Campaign Description
           </label>
-          <textarea
-            id="description"
-            name="description"
-            required
-            value={formData.description}
-            onChange={handleChange}
-            rows={3}
-            className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
-            placeholder="Describe your campaign goals and objectives"
-          />
+          <div className="relative">
+            <textarea
+              id="description"
+              name="description"
+              required
+              value={formData.description}
+              onChange={handleChange}
+              rows={6}
+              className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              placeholder="Describe your campaign goals and objectives"
+            />
+            <button
+              type="button"
+              onClick={generateDescription}
+              disabled={isGenerating}
+              className="absolute bottom-3 right-6 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 border-2 border-black rounded-md p-2 hover:opacity-90 transition-opacity flex items-center gap-1"
+              title="Generate description with AI"
+            >
+              {isGenerating ? (
+                <Loader2 className="animate-spin text-white" size={16} />
+              ) : (
+                <Sparkles className="text-white" size={16} />
+              )}
+              <span className="text-xs font-bold text-white">AI Generate</span>
+            </button>
+          </div>
         </div>
 
         <div>

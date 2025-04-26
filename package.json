@@ -86,9 +86,13 @@
     "@cloudflare/workers-types": "latest",
     "@op-engineering/op-sqlite": "latest",
     "@emotion/is-prop-valid": "latest",
+    "ws": "latest",
     "drizzle-orm": "latest",
     "drizzle-kit": "latest",
-    "framer-motion": "latest"
+    "framer-motion": "latest",
+    "openai": "latest",
+    "ai": "latest",
+    "@ai-sdk/cerebras": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
