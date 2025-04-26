@@ -337,11 +337,7 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
         )}
 
         {currentStep === 5 && (
-          <ReviewPosts
-            posts={postsWithVideos.length > 0 ? postsWithVideos : postsWithImages}
-            onComplete={handleReviewComplete}
-            onBack={prevStep}
-          />
+          <ReviewPosts posts={getPostsForCurrentStep()} onComplete={handleReviewComplete} onBack={prevStep} />
         )}
 
         {currentStep === 6 && campaign && selectedTheme && (
@@ -403,11 +399,11 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
           </div>
         )}
 
-        {currentStep === 5 && (!postsWithImages || postsWithImages.length === 0) && (
+        {currentStep === 5 && (!selectedPosts || selectedPosts.length === 0) && (
           <div className="text-center p-8">
             <p className="text-lg font-bold text-red-600">Missing data for review step</p>
             <p className="text-gray-600 mt-2">
-              No posts with images are available. Please go back to the previous steps and generate images first.
+              No posts are available. Please go back to the previous steps and generate content first.
             </p>
             <button
               onClick={prevStep}

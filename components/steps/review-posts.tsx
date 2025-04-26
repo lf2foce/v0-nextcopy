@@ -451,6 +451,49 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
     setViewerOpen(false)
   }
 
+  const toggleImageSelection = async (postId: string | number, imageIndex: number, postImages: any[]) => {
+    try {
+      const post = localPosts.find((p) => p.id === postId)
+      if (!post || !post.images) return
+
+      const imagesData = JSON.parse(post.images)
+      const updatedImages = [...imagesData.images]
+
+      // Toggle the isSelected property of the clicked image
+      updatedImages[imageIndex].isSelected = !updatedImages[imageIndex].isSelected
+
+      // Update the images data in the local state
+      setLocalPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.id === postId
+            ? {
+                ...p,
+                images: JSON.stringify({ images: updatedImages }),
+              }
+            : p,
+        ),
+      )
+
+      // Update the images in the database if it has a numeric ID
+      if (typeof postId === "number") {
+        const result = await updatePostImages([{ id: postId, images: JSON.stringify({ images: updatedImages }) }])
+
+        if (!result.success) {
+          toast({
+            title: "Warning",
+            description: "Image selection updated locally but not saved to database",
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Error toggling image selection:", error)
+      toast({
+        title: "Error",
+        description: "Failed to toggle image selection",
+      })
+    }
+  }
+
   if (validPosts.length === 0) {
     return (
       <div className="space-y-6">
@@ -562,133 +605,94 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
                   )}
                 </div>
 
-                {/* Images row - ONLY SELECTED IMAGES */}
-                {!isEditing && (
-                  <div className="px-4 mb-4">
-                    {(() => {
-                      let postImages = []
+                {/* Images row - ONLY SHOW IF ACTUAL IMAGES EXIST */}
+                {!isEditing &&
+                  (() => {
+                    let postImages = []
+                    let hasRealImages = false
 
-                      try {
-                        if (post.images) {
-                          const imagesData = JSON.parse(post.images)
-                          postImages = imagesData.images || []
-                        } else if (post.image || post.imageUrl) {
-                          // Fallback to single image if it exists
-                          postImages = [{ url: post.image || post.imageUrl, isSelected: true }]
-                        }
-                      } catch (e) {
-                        console.error("Error parsing images:", e)
-                        // If JSON parsing fails, fallback to single image if it exists
-                        if (post.image || post.imageUrl) {
-                          postImages = [{ url: post.image || post.imageUrl, isSelected: true }]
-                        }
+                    try {
+                      if (post.images) {
+                        const imagesData = JSON.parse(post.images)
+                        postImages = imagesData.images || []
+                        // Check if we have any non-placeholder images
+                        hasRealImages = postImages.some(
+                          (img) => img.url && !img.isPlaceholder && img.url !== "/placeholder.svg",
+                        )
+                      } else if (post.image || post.imageUrl) {
+                        // Fallback to single image if it exists
+                        postImages = [{ url: post.image || post.imageUrl, isSelected: true }]
+                        hasRealImages = true
                       }
-
-                      // If still no images, show a placeholder
-                      if (postImages.length === 0) {
-                        postImages = [{ url: "/placeholder.svg", isSelected: true, isPlaceholder: true }]
+                    } catch (e) {
+                      console.error("Error parsing images:", e)
+                      // If JSON parsing fails, fallback to single image if it exists
+                      if (post.image || post.imageUrl) {
+                        postImages = [{ url: post.image || post.imageUrl, isSelected: true }]
+                        hasRealImages = true
                       }
+                    }
 
-                      const toggleImageSelection = async (postId: string | number, imageIndex: number) => {
-                        try {
-                          const imagesData = JSON.parse(post.images)
-                          const updatedImages = [...imagesData.images]
+                    // If no real images, don't show the image section at all
+                    if (!hasRealImages || postImages.length === 0) {
+                      return null
+                    }
 
-                          // Toggle the isSelected property of the clicked image
-                          updatedImages[imageIndex].isSelected = !updatedImages[imageIndex].isSelected
-
-                          // Update the images data in the local state
-                          setLocalPosts((prevPosts) =>
-                            prevPosts.map((p) =>
-                              p.id === postId
-                                ? {
-                                    ...p,
-                                    images: JSON.stringify({ images: updatedImages }),
-                                  }
-                                : p,
-                            ),
-                          )
-
-                          // Update the images in the database if it has a numeric ID
-                          if (typeof postId === "number") {
-                            const result = await updatePostImages([
-                              { id: postId, images: JSON.stringify({ images: updatedImages }) },
-                            ])
-
-                            if (!result.success) {
-                              toast({
-                                title: "Warning",
-                                description: "Image selection updated locally but not saved to database",
-                                variant: "destructive",
-                              })
-                            }
-                          }
-                        } catch (error) {
-                          console.error("Error toggling image selection:", error)
-                          toast({
-                            title: "Error",
-                            description: "Failed to toggle image selection",
-                            variant: "destructive",
-                          })
-                        }
-                      }
-
-                      return (
-                        <>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {postImages.map((image, imageIndex) => (
+                    // Rest of the image section code
+                    return (
+                      <div className="px-4 mb-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {postImages.map((image, imageIndex) => (
+                            <div
+                              key={imageIndex}
+                              className={`relative border-4 ${
+                                image.isSelected ? "border-green-500" : "border-black"
+                              } rounded-md overflow-hidden h-40 cursor-pointer`}
+                              onClick={(e) => {
+                                // If holding Ctrl/Cmd key, toggle selection, otherwise open viewer
+                                if (e.ctrlKey || e.metaKey) {
+                                  toggleImageSelection(post.id, imageIndex, postImages)
+                                } else {
+                                  // Open image viewer with all images, starting at this index
+                                  openImageViewer(postImages, imageIndex)
+                                }
+                              }}
+                            >
+                              <Image
+                                src={image.url || "/placeholder.svg"}
+                                alt={`Image ${imageIndex + 1} for post ${index + 1}`}
+                                fill
+                                className="object-cover"
+                              />
                               <div
-                                key={imageIndex}
-                                className={`relative border-4 ${
-                                  image.isSelected ? "border-green-500" : "border-black"
-                                } rounded-md overflow-hidden h-40 cursor-pointer`}
-                                onClick={(e) => {
-                                  // If holding Ctrl/Cmd key, toggle selection, otherwise open viewer
-                                  if (e.ctrlKey || e.metaKey) {
-                                    toggleImageSelection(post.id, imageIndex)
-                                  } else {
-                                    // Open image viewer with all images, starting at this index
-                                    openImageViewer(postImages, imageIndex)
-                                  }
-                                }}
+                                className={`absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded-full ${
+                                  image.isSelected ? "bg-green-500 text-white" : "bg-white border-2 border-black"
+                                }`}
                               >
-                                <Image
-                                  src={image.url || "/placeholder.svg"}
-                                  alt={`Image ${imageIndex + 1} for post ${index + 1}`}
-                                  fill
-                                  className="object-cover"
-                                />
-                                <div
-                                  className={`absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded-full ${
-                                    image.isSelected ? "bg-green-500 text-white" : "bg-white border-2 border-black"
-                                  }`}
-                                >
-                                  {image.isSelected && <Check size={16} />}
-                                </div>
-                                <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                                  Style: {image.metadata?.style || "default"}
-                                </div>
+                                {image.isSelected && <Check size={16} />}
                               </div>
-                            ))}
-                          </div>
-                          <p className="text-sm text-gray-600 mt-2">
-                            Click to view larger image. Hold Ctrl/Cmd while clicking to select/deselect.
-                          </p>
-                        </>
-                      )
-                    })()}
-                    <div className="flex justify-end mt-2">
-                      <button
-                        onClick={() => handleRegenerateImage(post.id)}
-                        disabled={isRegeneratingImage || isRegeneratingPost || isEditing || isRegeneratingVideo}
-                        className="py-1 px-3 bg-yellow-300 border-2 border-black rounded-md hover:bg-yellow-400 flex items-center gap-1 text-sm disabled:opacity-50"
-                      >
-                        <RefreshCw size={14} />
-                        New Image
-                      </button>
-                    </div>
-                  </div>
-                )}
+                              <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                                Style: {image.metadata?.style || "default"}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-sm text-gray-600 mt-2">
+                          Click to view larger image. Hold Ctrl/Cmd while clicking to select/deselect.
+                        </p>
+                        <div className="flex justify-end mt-2">
+                          <button
+                            onClick={() => handleRegenerateImage(post.id)}
+                            disabled={isRegeneratingImage || isRegeneratingPost || isEditing || isRegeneratingVideo}
+                            className="py-1 px-3 bg-yellow-300 border-2 border-black rounded-md hover:bg-yellow-400 flex items-center gap-1 text-sm disabled:opacity-50"
+                          >
+                            <RefreshCw size={14} />
+                            New Image
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                 {/* Video status - only show if video exists */}
                 {!isEditing && post.videoUrl && (
