@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import type { Post } from "../campaign-workflow"
 import { CheckCircle, RefreshCw, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
@@ -42,12 +42,31 @@ export default function GenerateMultipleImages({
   const [imageStylePerPost, setImageStylePerPost] = useState<Record<string | number, string>>({})
   const [imageServicePerPost, setImageServicePerPost] = useState<Record<string | number, string>>({})
 
+  // Add these state variables near the other state declarations
+  const [retryCount, setRetryCount] = useState<Record<string | number, number>>({})
+  const MAX_RETRIES = 2
+
   // Refs for stable references
   const localPostsRef = useRef<Post[]>([])
   const pollingTimersRef = useRef<Record<string | number, NodeJS.Timeout>>({})
   const pollingAttemptsRef = useRef<Record<string | number, number>>({})
 
   const { toast } = useToast()
+
+  // Memoize the status summary to avoid recalculations on every render
+  const statusSummary = useMemo(() => {
+    const total = localPosts.length
+    const pending = localPosts.filter((post) => post.image_status === "pending" || !post.image_status).length
+    const generating = localPosts.filter(
+      (post) => post.image_status === "generating" || generatingPostIds.has(post.id) || pollingPostIds.has(post.id),
+    ).length
+    const completed = localPosts.filter(
+      (post) => post.image_status === "completed" || completedPostIds.has(post.id),
+    ).length
+    const failed = Object.keys(errorMessages).length
+
+    return { total, pending, generating, completed, failed }
+  }, [localPosts, generatingPostIds, pollingPostIds, completedPostIds, errorMessages])
 
   // Helper function to check if images are real (not placeholders)
   const hasRealImages = (post: Post) => {
@@ -201,6 +220,32 @@ export default function GenerateMultipleImages({
     })
   }
 
+  // Add this function near the other utility functions
+  const preloadImages = (images: any[]) => {
+    // Only preload up to 10 images to avoid overwhelming the browser
+    const imagesToPreload = images.slice(0, 10)
+
+    // Create an array of image preloading promises
+    const preloadPromises = imagesToPreload.map((img) => {
+      if (!img.url || img.url.includes("placeholder.svg") || img.url.startsWith("blob:")) {
+        return Promise.resolve(false)
+      }
+
+      return new Promise<boolean>((resolve) => {
+        const image = new Image()
+        image.onload = () => resolve(true)
+        image.onerror = () => resolve(false)
+        image.src = img.url
+
+        // Set a timeout to prevent hanging
+        setTimeout(() => resolve(false), 5000)
+      })
+    })
+
+    // Return a promise that resolves when all images are preloaded
+    return Promise.all(preloadPromises)
+  }
+
   // Update post with new images
   const updatePostWithImages = useCallback(
     async (postId: number, images: any[]) => {
@@ -220,25 +265,26 @@ export default function GenerateMultipleImages({
         return
       }
 
-      // Preload and validate images
-      const validationPromises = validImages.map((img) => preloadAndValidateImage(img.url))
-      const validationResults = await Promise.all(validationPromises)
+      // Preload images in background
+      preloadImages(validImages).then((results) => {
+        // Filter out images that failed to preload
+        const confirmedValidImages = validImages.filter((_, index) => results[index])
 
-      // Filter out images that failed validation
-      const confirmedValidImages = validImages.filter((_, index) => validationResults[index])
+        if (confirmedValidImages.length === 0) {
+          setErrorMessages((prev) => ({
+            ...prev,
+            [postId]: "All images failed to load",
+          }))
+          stopPollingForPost(postId)
+          return
+        }
 
-      if (confirmedValidImages.length === 0) {
-        setErrorMessages((prev) => ({
-          ...prev,
-          [postId]: "All images failed to load",
-        }))
-        stopPollingForPost(postId)
-        return
-      }
+        // Rest of the function remains the same...
+      })
 
-      // Format images data
+      // Format images data immediately without waiting for preload
       const formattedData = {
-        images: confirmedValidImages.map((img, idx) => ({
+        images: validImages.map((img, idx) => ({
           ...img,
           isSelected: true,
           order: idx,
@@ -252,7 +298,7 @@ export default function GenerateMultipleImages({
             return {
               ...post,
               images: JSON.stringify(formattedData),
-              imageUrl: confirmedValidImages[0]?.url || post.imageUrl,
+              imageUrl: validImages[0]?.url || post.imageUrl,
               image_status: "completed", // Update the status in local state
             }
           }
@@ -296,7 +342,7 @@ export default function GenerateMultipleImages({
       if (typeof postId === "number") {
         setTimeout(async () => {
           try {
-            await saveImageSelection(postId, JSON.stringify(formattedData), confirmedValidImages[0]?.url || "")
+            await saveImageSelection(postId, JSON.stringify(formattedData), validImages[0]?.url || "")
           } catch (error) {
             console.error("Error saving images to database:", error)
           }
@@ -458,52 +504,55 @@ export default function GenerateMultipleImages({
 
   // Global polling interval
   useEffect(() => {
-    const globalPollingInterval = setInterval(async () => {
+    // Use adaptive polling intervals based on the number of posts being polled
+    const getPollingInterval = () => {
+      const count = pollingPostIds.size
+      // Scale polling interval based on number of posts being polled
+      if (count > 10) return 8000 // 8 seconds for many posts
+      if (count > 5) return 6000 // 6 seconds for medium number
+      return 4000 // 4 seconds for few posts
+    }
+
+    // Create a single polling function that checks all posts
+    const pollAllPosts = async () => {
+      // Skip if no posts are being polled
+      if (pollingPostIds.size === 0) return
+
       // Get all posts being polled
-      const pollingIds = Array.from(pollingPostIds)
+      const pollingIds = Array.from(pollingPostIds).filter((id) => typeof id === "number") as number[]
       if (pollingIds.length === 0) return
 
-      // Check each post in parallel
-      const results = await Promise.all(
-        pollingIds.map(async (postId) => {
-          if (typeof postId !== "number") return null
+      // Check posts in batches to avoid overwhelming the server
+      const batchSize = 3
+      let updatedCount = 0
 
-          try {
-            const result = await checkImageGenerationStatus(postId)
+      for (let i = 0; i < pollingIds.length; i += batchSize) {
+        const batch = pollingIds.slice(i, i + batchSize)
 
-            if (result.success) {
-              // First check the image_status
-              if (result.data.status === "completed") {
-                // If status is completed, we should have images
-                if (result.data.images && result.data.images.length > 0) {
-                  // Process images as before
-                  const validImages = result.data.images.filter((img: any) => {
-                    return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
-                  })
+        // Process batch in parallel
+        const results = await Promise.all(
+          batch.map(async (postId) => {
+            try {
+              const result = await checkImageGenerationStatus(postId)
 
-                  if (validImages.length > 0) {
-                    updatePostWithImages(postId, validImages)
-                    stopPollingForPost(postId)
-
-                    toast({
-                      title: "Images ready",
-                      description: `Images for post ${postId} have been generated successfully.`,
+              if (result.success) {
+                // First check the image_status
+                if (result.data.status === "completed") {
+                  // If status is completed, we should have images
+                  if (result.data.images && result.data.images.length > 0) {
+                    // Process images
+                    const validImages = result.data.images.filter((img: any) => {
+                      return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
                     })
 
-                    return { updated: true, postId }
+                    if (validImages.length > 0) {
+                      updatePostWithImages(postId, validImages)
+                      stopPollingForPost(postId)
+                      return { updated: true, postId }
+                    }
                   }
-                } else {
-                  // Status is completed but no images found - this is an error
-                  setErrorMessages((prev) => ({
-                    ...prev,
-                    [postId]: "Generation completed but no images found",
-                  }))
-                  stopPollingForPost(postId)
                 }
-              }
-              // If status is generating, keep polling
-              else if (result.data.status === "generating") {
-                // Continue polling
+                // Increment polling attempts
                 pollingAttemptsRef.current[postId] = (pollingAttemptsRef.current[postId] || 0) + 1
 
                 // Stop after max attempts
@@ -515,42 +564,28 @@ export default function GenerateMultipleImages({
                   stopPollingForPost(postId)
                 }
               }
-              // If we have images regardless of status
-              else if (result.data.hasImages && result.data.images?.length > 0) {
-                // Process images as before
-                const validImages = result.data.images.filter((img: any) => {
-                  return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
-                })
-
-                if (validImages.length > 0) {
-                  updatePostWithImages(postId, validImages)
-                  stopPollingForPost(postId)
-
-                  toast({
-                    title: "Images ready",
-                    description: `Images for post ${postId} have been generated successfully.`,
-                  })
-
-                  return { updated: true, postId }
-                }
-              }
+            } catch (error) {
+              console.error(`Error checking status for post ${postId}:`, error)
             }
-          } catch (error) {
-            console.error(`Error checking status for post ${postId}:`, error)
-          }
 
-          return null
-        }),
-      )
+            return null
+          }),
+        )
+
+        updatedCount += results.filter((r) => r?.updated).length
+      }
 
       // If any posts were updated, force a UI refresh
-      if (results.some((result) => result?.updated)) {
+      if (updatedCount > 0) {
         forceRefresh()
       }
-    }, 5000)
+    }
+
+    // Set up the polling interval with adaptive timing
+    const interval = setInterval(pollAllPosts, getPollingInterval())
 
     return () => {
-      clearInterval(globalPollingInterval)
+      clearInterval(interval)
 
       // Clean up all polling timers
       Object.keys(pollingTimersRef.current).forEach((id) => {
@@ -558,7 +593,7 @@ export default function GenerateMultipleImages({
         delete pollingTimersRef.current[id]
       })
     }
-  }, [pollingPostIds, toast, updatePostWithImages, stopPollingForPost, forceRefresh])
+  }, [pollingPostIds, updatePostWithImages, stopPollingForPost, forceRefresh])
 
   // Handle regenerating images for a post
   const handleRegenerateImages = async (postId: string | number) => {
@@ -819,6 +854,33 @@ export default function GenerateMultipleImages({
     }
   }
 
+  // Add this function near the other utility functions
+  const retryFailedGeneration = async (postId: number) => {
+    // Clear error message
+    setErrorMessages((prev) => {
+      const next = { ...prev }
+      delete next[postId]
+      return next
+    })
+
+    // Increment retry count
+    setRetryCount((prev) => ({
+      ...prev,
+      [postId]: (prev[postId] || 0) + 1,
+    }))
+
+    // Get the current settings
+    const numImages = numImagesPerPost[postId] || 1
+    const imageStyle = imageStylePerPost[postId] || "realistic"
+    const imageService = imageServicePerPost[postId] || "flux"
+
+    // Log the retry
+    console.log(`Retrying image generation for post ${postId} (attempt ${(retryCount[postId] || 0) + 1})`)
+
+    // Generate images again
+    return handleGenerateImages(postId)
+  }
+
   // Handle generating all images
   const handleGenerateAllImages = async () => {
     // Set a loading state to prevent multiple clicks
@@ -946,68 +1008,78 @@ export default function GenerateMultipleImages({
     }
   }
 
-  // Manual UI refresh
-  const manualForceUIRefresh = async () => {
-    // Check all polling posts
-    const pollingPromises = Array.from(pollingPostIds).map(async (postId) => {
-      if (typeof postId === "number") {
-        try {
-          const result = await checkImageGenerationStatus(postId)
+  // Add this function near the other utility functions
+  const debounce = (func: Function, wait: number) => {
+    let timeout: NodeJS.Timeout | null = null
+    return (...args: any[]) => {
+      if (timeout) clearTimeout(timeout)
+      timeout = setTimeout(() => func(...args), wait)
+    }
+  }
 
-          if (result.success && result.data.hasImages && result.data.images?.length > 0) {
-            // Filter out blob URLs
-            const validImages = result.data.images.filter((img: any) => {
-              return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
-            })
-
-            if (validImages.length > 0) {
-              updatePostWithImages(postId, validImages)
-              stopPollingForPost(postId)
-            }
-          }
-        } catch (e) {
-          console.error(`Error checking status for post ${postId} during manual refresh:`, e)
-        }
-      }
+  // Replace the manualForceUIRefresh function with this optimized version
+  const manualForceUIRefresh = useCallback(async () => {
+    // Show loading toast
+    toast({
+      title: "Refreshing",
+      description: "Checking for new images...",
     })
 
-    // Wait for all checks to complete
-    await Promise.all(pollingPromises)
+    // Get all posts that need checking (either polling or not completed)
+    const postsToCheck = localPosts.filter((post) => pollingPostIds.has(post.id) || post.image_status !== "completed")
 
-    // Refresh all posts from database
-    try {
-      for (const post of localPosts) {
-        if (typeof post.id === "number") {
-          const result = await checkImageGenerationStatus(post.id)
-          if (result.success && result.data.hasImages && result.data.images?.length > 0) {
-            // Filter out blob URLs
-            const validImages = result.data.images.filter((img: any) => {
-              return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
-            })
-
-            if (validImages.length > 0) {
-              updatePostWithImages(post.id, validImages)
-            }
-          }
-        }
-      }
-
+    if (postsToCheck.length === 0) {
       toast({
-        title: "UI Refreshed",
-        description: "All post images have been refreshed from the database.",
+        title: "No updates needed",
+        description: "All posts are already complete.",
       })
-    } catch (error) {
-      console.error("Error refreshing posts from database:", error)
-      toast({
-        title: "Error",
-        description: "Failed to refresh some posts from database",
-        variant: "destructive",
-      })
+      return
     }
+
+    // Check posts in batches to avoid overwhelming the server
+    const batchSize = 5
+    let updatedCount = 0
+
+    for (let i = 0; i < postsToCheck.length; i += batchSize) {
+      const batch = postsToCheck.slice(i, i + batchSize)
+
+      // Process batch in parallel
+      const results = await Promise.all(
+        batch.map(async (post) => {
+          if (typeof post.id !== "number") return null
+
+          try {
+            const result = await checkImageGenerationStatus(post.id)
+            if (result.success && result.data.hasImages && result.data.images?.length > 0) {
+              const validImages = result.data.images.filter((img: any) => {
+                return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
+              })
+
+              if (validImages.length > 0) {
+                await updatePostWithImages(post.id, validImages)
+                return { updated: true }
+              }
+            }
+          } catch (e) {
+            console.error(`Error checking status for post ${post.id}:`, e)
+          }
+
+          return null
+        }),
+      )
+
+      updatedCount += results.filter((r) => r?.updated).length
+    }
+
+    // Show result toast
+    toast({
+      title: "Refresh complete",
+      description: updatedCount > 0 ? `Updated ${updatedCount} posts with new images.` : "No new images found.",
+    })
 
     // Force refresh
     forceRefresh()
-  }
+  }, [localPosts, pollingPostIds, toast, updatePostWithImages, forceRefresh])
 
   // Toggle image selection
   const toggleImageSelection = async (postId: string | number, imageIndex: number) => {
@@ -1194,9 +1266,18 @@ export default function GenerateMultipleImages({
       </div>
 
       <div className="flex justify-between items-center">
-        <p className="text-sm">
-          <span className="font-bold">{localPosts.length}</span> posts to generate images for
-        </p>
+        <div>
+          <p className="text-sm">
+            <span className="font-bold">{localPosts.length}</span> posts to generate images for
+          </p>
+          <p className="text-xs text-gray-500">
+            {statusSummary.completed} completed ·
+            {statusSummary.generating > 0 && (
+              <span className="text-blue-500"> {statusSummary.generating} generating</span>
+            )}
+            {statusSummary.failed > 0 && <span className="text-red-500"> · {statusSummary.failed} failed</span>}
+          </p>
+        </div>
         <div className="flex gap-2">
           <button
             onClick={manualForceUIRefresh}
@@ -1263,6 +1344,7 @@ export default function GenerateMultipleImages({
             onChangeNumImages={handleChangeNumImages}
             onChangeImageStyle={handleChangeImageStyle}
             onChangeImageService={handleChangeImageService}
+            onRetry={retryCount[post.id] < MAX_RETRIES ? retryFailedGeneration : undefined} // Add this line
           />
         ))}
       </div>
