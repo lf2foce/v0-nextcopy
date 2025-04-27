@@ -108,7 +108,6 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   const [postsWithVideos, setPostsWithVideos] = useState<Post[]>(initialData?.postsWithVideos || [])
   const [reviewedPosts, setReviewedPosts] = useState<Post[]>([])
   const [isWorkflowComplete, setIsWorkflowComplete] = useState(false)
-  const [isLoading, setIsLoading] = useState(false) // Add loading state
   const { toast } = useToast()
 
   // Set initial step based on prop
@@ -134,25 +133,17 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   }, [initialData])
 
   const nextStep = async () => {
-    setIsLoading(true) // Start loading
-    try {
-      const newStep = Math.min(currentStep + 1, steps.length - 1)
-      setCurrentStep(newStep)
+    const newStep = Math.min(currentStep + 1, steps.length - 1)
+    setCurrentStep(newStep)
 
-      // Update database step if we have a campaign ID
-      if (campaign?.id) {
-        const dbStep = uiToDatabaseStepMap[newStep as keyof typeof uiToDatabaseStepMap] || 0
+    // Update database step if we have a campaign ID
+    if (campaign?.id) {
+      const dbStep = uiToDatabaseStepMap[newStep as keyof typeof uiToDatabaseStepMap] || 0
+      try {
         await updateCampaignStep(campaign.id, dbStep)
+      } catch (error) {
+        console.error("Failed to update campaign step:", error)
       }
-    } catch (error) {
-      console.error("Failed to update campaign step:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update campaign step. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false) // End loading
     }
   }
 
@@ -160,162 +151,127 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
     setCurrentStep((prev) => Math.max(prev - 1, 0))
   }
 
-  const handleCreateCampaign = async (data: Campaign) => {
-    setIsLoading(true) // Start loading
-    try {
-      console.log("Campaign created with data:", data)
-      // Ensure we have an ID before proceeding
-      if (!data.id) {
-        console.error("Campaign created but ID is missing")
-        toast({
-          title: "Error",
-          description: "Campaign created but ID is missing. Please try again.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      setCampaign(data)
-      // Use setTimeout to ensure state is updated before changing steps
-      setTimeout(() => {
-        nextStep()
-      }, 0)
-    } finally {
-      setIsLoading(false) // End loading
-    }
-  }
-
-  const handleThemeSelected = async (theme: Theme) => {
-    setIsLoading(true) // Start loading
-    try {
-      console.log("Theme selected:", theme)
-      setSelectedTheme(theme)
-      nextStep()
-    } finally {
-      setIsLoading(false) // End loading
-    }
-  }
-
-  const handleApproveContent = async (approvedPosts: Post[]) => {
-    setIsLoading(true) // Start loading
-    try {
-      setSelectedPosts(approvedPosts)
-      setPosts(approvedPosts) // Also update the main posts array
-      nextStep()
-    } finally {
-      setIsLoading(false) // End loading
-    }
-  }
-
-  const handleGenerateImages = async (updatedPosts: Post[]) => {
-    setIsLoading(true) // Start loading
-    try {
-      // Store the posts with their image selection state
-      setPostsWithImages(updatedPosts)
-      setPosts(updatedPosts) // Update the main posts array
-
-      // Also update the selectedPosts array to maintain consistency when going back
-      setSelectedPosts((prevSelectedPosts) => {
-        return prevSelectedPosts.map((prevPost) => {
-          // Find the corresponding updated post
-          const updatedPost = updatedPosts.find((p) => p.id === prevPost.id)
-          // If found, use its updated data (including image selection state)
-          return updatedPost || prevPost
-        })
+  const handleCreateCampaign = (data: Campaign) => {
+    console.log("Campaign created with data:", data)
+    // Ensure we have an ID before proceeding
+    if (!data.id) {
+      console.error("Campaign created but ID is missing")
+      toast({
+        title: "Error",
+        description: "Campaign created but ID is missing. Please try again.",
+        variant: "destructive",
       })
-
-      nextStep()
-    } finally {
-      setIsLoading(false) // End loading
+      return
     }
+
+    setCampaign(data)
+    // Use setTimeout to ensure state is updated before changing steps
+    setTimeout(() => {
+      nextStep()
+    }, 0)
   }
 
-  const handleGenerateVideos = async (updatedPosts: Post[]) => {
-    setIsLoading(true) // Start loading
-    try {
-      setPostsWithVideos(updatedPosts)
-      setPosts(updatedPosts) // Update the main posts array
-      nextStep()
-    } finally {
-      setIsLoading(false) // End loading
-    }
+  const handleThemeSelected = (theme: Theme) => {
+    console.log("Theme selected:", theme)
+    setSelectedTheme(theme)
+    nextStep()
+  }
+
+  const handleApproveContent = (approvedPosts: Post[]) => {
+    setSelectedPosts(approvedPosts)
+    setPosts(approvedPosts) // Also update the main posts array
+    nextStep()
+  }
+
+  const handleGenerateImages = (updatedPosts: Post[]) => {
+    // Store the posts with their image selection state
+    setPostsWithImages(updatedPosts)
+    setPosts(updatedPosts) // Update the main posts array
+
+    // Also update the selectedPosts array to maintain consistency when going back
+    setSelectedPosts((prevSelectedPosts) => {
+      return prevSelectedPosts.map((prevPost) => {
+        // Find the corresponding updated post
+        const updatedPost = updatedPosts.find((p) => p.id === prevPost.id)
+        // If found, use its updated data (including image selection state)
+        return updatedPost || prevPost
+      })
+    })
+
+    nextStep()
+  }
+
+  const handleGenerateVideos = (updatedPosts: Post[]) => {
+    setPostsWithVideos(updatedPosts)
+    setPosts(updatedPosts) // Update the main posts array
+    nextStep()
   }
 
   const handleReviewComplete = async (finalPosts: Post[]) => {
-    setIsLoading(true) // Start loading
-    try {
-      setReviewedPosts(finalPosts)
-      setPosts(finalPosts) // Update the main posts array
+    setReviewedPosts(finalPosts)
+    setPosts(finalPosts) // Update the main posts array
 
-      // Update to step 7 (Completion) when review is complete
-      if (campaign?.id) {
-        try {
-          const CAMPAIGN_STEPS = await getCampaignSteps()
-          await updateCampaignStep(campaign.id, CAMPAIGN_STEPS.COMPLETION) // Now using 7 instead of 8
-        } catch (error) {
-          console.error("Failed to update campaign step:", error)
-        }
+    // Update to step 7 (Completion) when review is complete
+    if (campaign?.id) {
+      try {
+        const CAMPAIGN_STEPS = await getCampaignSteps()
+        await updateCampaignStep(campaign.id, CAMPAIGN_STEPS.COMPLETION) // Now using 7 instead of 8
+      } catch (error) {
+        console.error("Failed to update campaign step:", error)
       }
-
-      nextStep()
-    } finally {
-      setIsLoading(false) // End loading
     }
+
+    nextStep()
   }
 
   const handleScheduleComplete = async () => {
-    setIsLoading(true) // Start loading
-    try {
-      // Immediately set workflow as complete to update UI
-      setIsWorkflowComplete(true)
+    // Immediately set workflow as complete to update UI
+    setIsWorkflowComplete(true)
 
-      // Update to step 8 (SCHEDULED) when scheduling is complete
-      if (campaign?.id) {
-        try {
-          const CAMPAIGN_STEPS = await getCampaignSteps()
-          console.log("Updating campaign to SCHEDULED step:", CAMPAIGN_STEPS.SCHEDULED)
-          const result = await updateCampaignStep(campaign.id, CAMPAIGN_STEPS.SCHEDULED)
-          console.log("Update campaign step result:", result)
+    // Update to step 8 (SCHEDULED) when scheduling is complete
+    if (campaign?.id) {
+      try {
+        const CAMPAIGN_STEPS = await getCampaignSteps()
+        console.log("Updating campaign to SCHEDULED step:", CAMPAIGN_STEPS.SCHEDULED)
+        const result = await updateCampaignStep(campaign.id, CAMPAIGN_STEPS.SCHEDULED)
+        console.log("Update campaign step result:", result)
 
-          if (result.success) {
-            // Also update the local campaign object to reflect the new step
-            if (campaign) {
-              setCampaign({
-                ...campaign,
-                currentStep: CAMPAIGN_STEPS.SCHEDULED,
-              })
-            }
-
-            toast({
-              title: "Campaign Scheduled",
-              description: "Your campaign has been successfully scheduled and is ready to go!",
-              variant: "success",
-            })
-          } else {
-            console.error("Failed to update campaign step:", result.error)
-            toast({
-              title: "Warning",
-              description: "Campaign was scheduled but status update failed. Please refresh the page.",
-              variant: "warning",
+        if (result.success) {
+          // Also update the local campaign object to reflect the new step
+          if (campaign) {
+            setCampaign({
+              ...campaign,
+              currentStep: CAMPAIGN_STEPS.SCHEDULED,
             })
           }
-        } catch (error) {
-          console.error("Failed to update campaign step:", error)
+
+          toast({
+            title: "Campaign Scheduled",
+            description: "Your campaign has been successfully scheduled and is ready to go!",
+            variant: "success",
+          })
+        } else {
+          console.error("Failed to update campaign step:", result.error)
           toast({
             title: "Warning",
             description: "Campaign was scheduled but status update failed. Please refresh the page.",
             variant: "warning",
           })
         }
-      } else {
+      } catch (error) {
+        console.error("Failed to update campaign step:", error)
         toast({
-          title: "Campaign Scheduled",
-          description: "Your campaign has been successfully scheduled and is ready to go!",
-          variant: "success",
+          title: "Warning",
+          description: "Campaign was scheduled but status update failed. Please refresh the page.",
+          variant: "warning",
         })
       }
-    } finally {
-      setIsLoading(false) // End loading
+    } else {
+      toast({
+        title: "Campaign Scheduled",
+        description: "Your campaign has been successfully scheduled and is ready to go!",
+        variant: "success",
+      })
     }
   }
 
@@ -338,17 +294,6 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
       className={`sm:bg-white sm:border-4 sm:border-black sm:rounded-lg sm:p-6 sm:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-2`}
     >
       <WorkflowProgress steps={steps} currentStep={currentStep} isWorkflowComplete={isWorkflowComplete} />
-
-      {/* Loading overlay */}
-      {isLoading && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center">
-            <div className="animate-spin h-10 w-10 border-4 border-black border-t-transparent rounded-full mb-4"></div>
-            <p className="text-lg font-medium">Loading...</p>
-            <p className="text-sm text-gray-500">Connecting to database...</p>
-          </div>
-        </div>
-      )}
 
       <motion.div
         key={currentStep}

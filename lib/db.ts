@@ -6,17 +6,15 @@ import { sql } from "drizzle-orm"
 neonConfig.fetchOptions = {
   cache: "no-store", // Disable caching
   keepalive: true, // Keep connection alive
-  priority: "high", // Add high priority for fetch requests
 }
 
-// Increase timeouts for better reliability
-neonConfig.connectionTimeoutMillis = 15000 // 15 seconds (increased from 10)
-neonConfig.queryTimeoutMillis = 45000 // 45 seconds (increased from 30)
+neonConfig.connectionTimeoutMillis = 10000 // 10 seconds
+neonConfig.queryTimeoutMillis = 30000 // 30 seconds
 
 // Create a singleton SQL client to prevent connection issues
 let sqlClient: ReturnType<typeof neon> | null = null
 
-// Get or create the SQL client with connection warming
+// Get or create the SQL client
 function getSqlClient() {
   if (!sqlClient) {
     const connectionString = process.env.DATABASE_URL
@@ -26,17 +24,7 @@ function getSqlClient() {
     }
 
     try {
-      // Create the SQL client
       sqlClient = neon(connectionString)
-
-      // Warm up the connection with a simple query
-      // This helps establish the connection pool early
-      setTimeout(() => {
-        sqlClient?.query("SELECT 1").catch((err) => {
-          console.warn("Connection warm-up failed:", err)
-        })
-      }, 100)
-
       console.log("Neon SQL client initialized successfully")
     } catch (error) {
       console.error("Failed to create Neon client:", error)
@@ -50,12 +38,10 @@ function getSqlClient() {
 // Create a Drizzle ORM instance with lazy initialization
 export const db = drizzle(getSqlClient())
 
-// Test the database connection with improved error handling
+// Test the database connection
 export async function testDatabaseConnection() {
   try {
-    console.time("Database connection test")
     const result = await db.execute(sql`SELECT 1 as test`)
-    console.timeEnd("Database connection test")
     return { success: true, result }
   } catch (error) {
     console.error("Database connection test failed:", error)
@@ -109,25 +95,6 @@ export async function safeQuery<T>(queryFn: () => Promise<T>): Promise<{ data: T
     return {
       data: null,
       error: error instanceof Error ? error : new Error(String(error)),
-    }
-  }
-}
-
-// Add a connection status checker that can be used to verify connection health
-export async function checkConnectionStatus() {
-  try {
-    const startTime = performance.now()
-    await db.execute(sql`SELECT 1`)
-    const endTime = performance.now()
-
-    return {
-      connected: true,
-      latency: Math.round(endTime - startTime),
-    }
-  } catch (error) {
-    return {
-      connected: false,
-      error: error instanceof Error ? error.message : String(error),
     }
   }
 }
