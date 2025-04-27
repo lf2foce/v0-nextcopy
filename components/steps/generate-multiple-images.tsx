@@ -770,83 +770,93 @@ export default function GenerateMultipleImages({
 
   // Handle generating all images
   const handleGenerateAllImages = async () => {
-    // Clear errors and completed posts
-    setErrorMessages({})
-    setCompletedPostIds(new Set())
-
-    // Stop all polling
-    pollingPostIds.forEach((postId) => {
-      if (typeof postId === "number") {
-        stopPollingForPost(postId)
-      }
-    })
+    // Set a loading state to prevent multiple clicks
+    setIsSubmitting(true)
 
     try {
-      const postsToProcess = [...localPosts]
+      // Batch state updates together
+      setErrorMessages({})
+      setCompletedPostIds(new Set())
+
+      // Get all posts that need processing
+      const postsToProcess = [...localPosts].filter((post) => !pollingPostIds.has(post.id))
+
+      if (postsToProcess.length === 0) {
+        toast({
+          title: "No posts to process",
+          description: "All posts are already being processed.",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
+      // Prepare all placeholder images first (no state updates yet)
+      const updates = {}
+      for (const post of postsToProcess) {
+        if (typeof post.id === "number") {
+          updates[post.id] = generatePlaceholderImages(post.id)
+        }
+      }
+
+      // Batch update all posts at once
+      setLocalPosts((prevPosts) => {
+        return prevPosts.map((post) => {
+          if (updates[post.id]) {
+            return {
+              ...post,
+              images: JSON.stringify({ images: updates[post.id] }),
+            }
+          }
+          return post
+        })
+      })
+
+      // Force a single refresh after all updates
+      forceRefresh()
+
+      // Clear images in database in parallel
+      const clearPromises = Object.entries(updates).map(([postId, placeholderImages]) =>
+        clearPostImages(Number(postId), placeholderImages),
+      )
+
+      // Wait for all clear operations to complete
+      await Promise.all(clearPromises)
+
+      // Process in batches of 3 to avoid overwhelming the server
+      const batchSize = 3
       let successCount = 0
       let processingCount = 0
       let errorCount = 0
-      let skippedCount = 0
 
-      // Force refresh before starting
-      forceRefresh()
+      for (let i = 0; i < postsToProcess.length; i += batchSize) {
+        const batch = postsToProcess.slice(i, i + batchSize)
 
-      // Process posts one by one
-      for (let i = 0; i < postsToProcess.length; i++) {
-        const post = postsToProcess[i]
+        // Process batch in parallel
+        const results = await Promise.all(
+          batch.map(async (post) => {
+            if (typeof post.id !== "number") return { success: false }
 
-        // Skip if already polling
-        if (pollingPostIds.has(post.id)) {
-          skippedCount++
-          continue
-        }
+            const numImages = numImagesPerPost[post.id] || 1
+            const result = await handleGenerateImages(post.id)
 
-        // Clear existing images
-        if (typeof post.id === "number") {
-          const placeholderImages = generatePlaceholderImages(post.id)
-          setLocalPosts((prevPosts) => {
-            return prevPosts.map((p) => {
-              if (p.id === post.id) {
-                return {
-                  ...p,
-                  images: JSON.stringify({ images: placeholderImages }),
-                }
-              }
-              return p
-            })
-          })
+            return result
+          }),
+        )
 
-          // Force refresh after clearing each post's images
-          forceRefresh()
-
-          // Clear images in database
-          await clearPostImages(post.id, placeholderImages)
-        }
-
-        // Add this before calling handleGenerateImages:
-        const numImages = numImagesPerPost[post.id] || 1
-        console.log(`Generating ${numImages} images for post ${post.id}`)
-
-        // Then call handleGenerateImages with the post ID
-        const result = await handleGenerateImages(post.id)
-
-        if (result.success) {
-          if (result.status === "processing") {
+        // Count results
+        results.forEach((result) => {
+          if (!result.success) {
+            errorCount++
+          } else if (result.status === "processing") {
             processingCount++
-          } else if (result.status === "already_polling") {
-            skippedCount++
           } else if (result.status === "completed") {
             successCount++
-            // Force refresh after each immediate success
-            forceRefresh()
           }
-        } else {
-          errorCount++
-        }
+        })
 
-        // Small delay between requests
-        if (i < postsToProcess.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 500))
+        // Small delay between batches, not between individual posts
+        if (i + batchSize < postsToProcess.length) {
+          await new Promise((resolve) => setTimeout(resolve, 300))
         }
       }
 
@@ -865,7 +875,7 @@ export default function GenerateMultipleImages({
       } else {
         toast({
           title: "Images generated",
-          description: `Generated images for ${successCount} posts. Skipped ${skippedCount} posts.`,
+          description: `Generated images for ${successCount} posts.`,
         })
       }
 
@@ -878,6 +888,9 @@ export default function GenerateMultipleImages({
         description: "Failed to generate all images: " + (error instanceof Error ? error.message : String(error)),
         variant: "destructive",
       })
+    } finally {
+      // Always reset submitting state
+      setIsSubmitting(false)
     }
   }
 
