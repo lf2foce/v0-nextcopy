@@ -51,6 +51,17 @@ export default function GenerateMultipleImages({
 
   // Helper function to check if images are real (not placeholders)
   const hasRealImages = (post: Post) => {
+    // First check image_status - if it's "generating", we're still waiting
+    if (post.image_status === "generating") {
+      return false
+    }
+
+    // If status is "completed", we should have images
+    if (post.image_status === "completed") {
+      return true
+    }
+
+    // Otherwise check the images content
     if (!post.images) return false
     try {
       const imagesData = JSON.parse(post.images)
@@ -242,6 +253,7 @@ export default function GenerateMultipleImages({
               ...post,
               images: JSON.stringify(formattedData),
               imageUrl: confirmedValidImages[0]?.url || post.imageUrl,
+              image_status: "completed", // Update the status in local state
             }
           }
           return post
@@ -328,7 +340,8 @@ export default function GenerateMultipleImages({
           const result = await checkImageGenerationStatus(postId)
 
           if (result.success) {
-            if (result.data.hasImages || result.data.isComplete) {
+            // First check if status is completed or we have images
+            if (result.data.status === "completed" || result.data.hasImages) {
               // Stop polling
               clearInterval(pollingTimersRef.current[postId])
               delete pollingTimersRef.current[postId]
@@ -376,7 +389,7 @@ export default function GenerateMultipleImages({
                     } else {
                       setErrorMessages((prev) => ({
                         ...prev,
-                        [postId]: "No valid images were generated",
+                        [postId]: "Generation completed but no images found",
                       }))
                       stopPollingForPost(postId)
                     }
@@ -397,27 +410,30 @@ export default function GenerateMultipleImages({
 
               // Force UI refresh
               forceRefresh()
+            } else if (result.data.status === "generating") {
+              // Continue polling
+              if (attempts >= 30) {
+                // Stop polling after max attempts
+                stopPollingForPost(postId)
+
+                setErrorMessages((prev) => ({
+                  ...prev,
+                  [postId]: "Timed out waiting for images",
+                }))
+
+                forceRefresh()
+              }
             } else if (attempts >= 30) {
-              // Stop polling after max attempts
+              // Stop polling after max attempts on error
               stopPollingForPost(postId)
 
               setErrorMessages((prev) => ({
                 ...prev,
-                [postId]: "Timed out waiting for images",
+                [postId]: result.error || "Failed to check image status",
               }))
 
               forceRefresh()
             }
-          } else if (attempts >= 30) {
-            // Stop polling after max attempts on error
-            stopPollingForPost(postId)
-
-            setErrorMessages((prev) => ({
-              ...prev,
-              [postId]: result.error || "Failed to check image status",
-            }))
-
-            forceRefresh()
           }
         } catch (error) {
           console.error(`Error polling for post ${postId}:`, error)
@@ -456,60 +472,28 @@ export default function GenerateMultipleImages({
             const result = await checkImageGenerationStatus(postId)
 
             if (result.success) {
-              // If images are ready
-              if (result.data.hasImages && result.data.images?.length > 0) {
-                // Filter out blob URLs
-                const validImages = result.data.images.filter((img: any) => {
-                  return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
-                })
-
-                if (validImages.length > 0) {
-                  // Update post with images
-                  updatePostWithImages(postId, validImages)
-
-                  // Stop polling for this post
-                  stopPollingForPost(postId)
-
-                  // Show success message
-                  toast({
-                    title: "Images ready",
-                    description: `Images for post ${postId} have been generated successfully.`,
-                  })
-
-                  return { updated: true, postId }
-                } else {
-                  // No valid images
-                  setErrorMessages((prev) => ({
-                    ...prev,
-                    [postId]: "No valid images were generated",
-                  }))
-                  stopPollingForPost(postId)
-                }
-              }
-              // If generation is complete but no images found
-              else if (result.data.isComplete) {
-                // Try one more direct fetch
-                const finalResult = await checkImageGenerationStatus(postId)
-                if (finalResult.success && finalResult.data.hasImages && finalResult.data.images?.length > 0) {
-                  // Filter out blob URLs
-                  const validImages = finalResult.data.images.filter((img: any) => {
+              // First check the image_status
+              if (result.data.status === "completed") {
+                // If status is completed, we should have images
+                if (result.data.images && result.data.images.length > 0) {
+                  // Process images as before
+                  const validImages = result.data.images.filter((img: any) => {
                     return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
                   })
 
                   if (validImages.length > 0) {
                     updatePostWithImages(postId, validImages)
                     stopPollingForPost(postId)
+
+                    toast({
+                      title: "Images ready",
+                      description: `Images for post ${postId} have been generated successfully.`,
+                    })
+
                     return { updated: true, postId }
-                  } else {
-                    // No valid images
-                    setErrorMessages((prev) => ({
-                      ...prev,
-                      [postId]: "No valid images were generated",
-                    }))
-                    stopPollingForPost(postId)
                   }
                 } else {
-                  // Stop polling with error
+                  // Status is completed but no images found - this is an error
                   setErrorMessages((prev) => ({
                     ...prev,
                     [postId]: "Generation completed but no images found",
@@ -517,8 +501,9 @@ export default function GenerateMultipleImages({
                   stopPollingForPost(postId)
                 }
               }
-              // Increment polling attempts
-              else {
+              // If status is generating, keep polling
+              else if (result.data.status === "generating") {
+                // Continue polling
                 pollingAttemptsRef.current[postId] = (pollingAttemptsRef.current[postId] || 0) + 1
 
                 // Stop after max attempts
@@ -528,12 +513,25 @@ export default function GenerateMultipleImages({
                     [postId]: "Timed out waiting for images",
                   }))
                   stopPollingForPost(postId)
+                }
+              }
+              // If we have images regardless of status
+              else if (result.data.hasImages && result.data.images?.length > 0) {
+                // Process images as before
+                const validImages = result.data.images.filter((img: any) => {
+                  return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
+                })
+
+                if (validImages.length > 0) {
+                  updatePostWithImages(postId, validImages)
+                  stopPollingForPost(postId)
 
                   toast({
-                    title: "Generation timeout",
-                    description: `Timed out waiting for images for post ${postId}`,
-                    variant: "destructive",
+                    title: "Images ready",
+                    description: `Images for post ${postId} have been generated successfully.`,
                   })
+
+                  return { updated: true, postId }
                 }
               }
             }
@@ -586,6 +584,7 @@ export default function GenerateMultipleImages({
             return {
               ...post,
               images: JSON.stringify({ images: placeholderImages }),
+              image_status: "pending", // Reset status
             }
           }
           return post
@@ -641,6 +640,19 @@ export default function GenerateMultipleImages({
           return { success: true, status: "already_polling" }
         }
 
+        // Update local state to show generating status
+        setLocalPosts((prevPosts) => {
+          return prevPosts.map((post) => {
+            if (post.id === postId) {
+              return {
+                ...post,
+                image_status: "generating", // Set status to generating
+              }
+            }
+            return post
+          })
+        })
+
         // Call API to generate images
         const result = await processImageGeneration(postId, numImages, imageStyle, imageService)
 
@@ -659,6 +671,19 @@ export default function GenerateMultipleImages({
             const next = new Set(prev)
             next.delete(postId)
             return next
+          })
+
+          // Reset status in local state
+          setLocalPosts((prevPosts) => {
+            return prevPosts.map((post) => {
+              if (post.id === postId) {
+                return {
+                  ...post,
+                  image_status: "pending", // Reset status on error
+                }
+              }
+              return post
+            })
           })
 
           return result
@@ -706,6 +731,19 @@ export default function GenerateMultipleImages({
               const next = new Set(prev)
               next.delete(postId)
               return next
+            })
+
+            // Reset status in local state
+            setLocalPosts((prevPosts) => {
+              return prevPosts.map((post) => {
+                if (post.id === postId) {
+                  return {
+                    ...post,
+                    image_status: "pending", // Reset status if no valid images
+                  }
+                }
+                return post
+              })
             })
 
             return { success: false, error: "No valid images were generated" }
@@ -764,6 +802,19 @@ export default function GenerateMultipleImages({
         return next
       })
 
+      // Reset status in local state
+      setLocalPosts((prevPosts) => {
+        return prevPosts.map((post) => {
+          if (post.id === postId) {
+            return {
+              ...post,
+              image_status: "pending", // Reset status on error
+            }
+          }
+          return post
+        })
+      })
+
       return { success: false, error: errorMessage }
     }
   }
@@ -805,6 +856,7 @@ export default function GenerateMultipleImages({
             return {
               ...post,
               images: JSON.stringify({ images: updates[post.id] }),
+              image_status: "pending", // Reset status
             }
           }
           return post

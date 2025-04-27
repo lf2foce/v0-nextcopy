@@ -468,6 +468,72 @@ export async function checkThemePostStatus(themeId: number) {
 //   }
 // }
 
+// Check image generation status for a post
+export async function checkImageGenerationStatus(postId: number) {
+  try {
+    console.log(`Checking image generation status for post ${postId}`)
+
+    // Get the post from the database to check its image_status
+    const [post] = await db.select().from(contentPosts).where(eq(contentPosts.id, postId)).limit(1)
+
+    if (!post) {
+      return {
+        success: false,
+        error: "Post not found",
+      }
+    }
+
+    // Return the current status and any images if they exist
+    let images = []
+    if (post.images) {
+      try {
+        const imagesData = JSON.parse(post.images)
+        images = imagesData.images?.images || imagesData.images || []
+
+        // Filter out placeholder images and blob URLs
+        images = images.filter((img: any) => {
+          return img && img.url && !img.url.includes("placeholder.svg") && !img.url.startsWith("blob:")
+        })
+      } catch (e) {
+        console.error("Error parsing images JSON:", e)
+      }
+    }
+
+    // Check if we have real images (not placeholders)
+    const hasRealImages = images.length > 0
+
+    // Determine the status based on image_status field and presence of images
+    let status = post.image_status || "pending"
+    let isComplete = status === "completed" || hasRealImages
+
+    // If status is "generating" but we have images, update status to "completed"
+    if (status === "generating" && hasRealImages) {
+      // Update the status in the database
+      await db.update(contentPosts).set({ image_status: "completed" }).where(eq(contentPosts.id, postId))
+
+      status = "completed"
+      isComplete = true
+    }
+
+    return {
+      success: true,
+      data: {
+        status: status,
+        isComplete: isComplete,
+        hasImages: hasRealImages,
+        images: images,
+        imageUrl: post.imageUrl,
+      },
+    }
+  } catch (error) {
+    console.error("Failed to check image generation status:", error)
+    return {
+      success: false,
+      error: "Failed to check image status: " + (error instanceof Error ? error.message : String(error)),
+    }
+  }
+}
+
 // Post to social media
 // export async function postToSocialMedia(postId: number, platform: string, content: string) {
 //   try {
@@ -604,6 +670,9 @@ export async function processImageGeneration(
       `Processing image generation: ${numImages} images with style "${imageStyle}" using service "${imageService}" for post ${postId}`,
     )
 
+    // First update the post's image_status to "generating"
+    await db.update(contentPosts).set({ image_status: "generating" }).where(eq(contentPosts.id, postId))
+
     const siteUrl = getSiteUrl()
     const response = await fetch(
       `${siteUrl}/api/posts/${postId}/generate-images?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}&image_service=${encodeURIComponent(imageService)}`,
@@ -618,6 +687,10 @@ export async function processImageGeneration(
     if (!response.ok) {
       const errorMessage = await handleApiError(response)
       console.error("Failed to generate images:", errorMessage)
+
+      // Reset status to pending on error
+      await db.update(contentPosts).set({ image_status: "pending" }).where(eq(contentPosts.id, postId))
+
       return { success: false, error: errorMessage }
     }
 
@@ -678,12 +751,23 @@ export async function processImageGeneration(
       }
     }
 
+    // Reset status to pending if we get here (no images and not processing)
+    await db.update(contentPosts).set({ image_status: "pending" }).where(eq(contentPosts.id, postId))
+
     return {
       success: false,
       error: "API returned no image data",
     }
   } catch (error) {
     console.error("Error in processImageGeneration:", error)
+
+    // Reset status to pending on error
+    try {
+      await db.update(contentPosts).set({ image_status: "pending" }).where(eq(contentPosts.id, postId))
+    } catch (dbError) {
+      console.error("Error resetting image status:", dbError)
+    }
+
     return {
       success: false,
       error: "Failed to process image generation: " + (error instanceof Error ? error.message : String(error)),
@@ -692,59 +776,6 @@ export async function processImageGeneration(
 }
 
 // Check image generation status for a post
-export async function checkImageGenerationStatus(postId: number) {
-  try {
-    console.log(`Checking image generation status for post ${postId}`)
-
-    // Get the post from the database to check its image_status
-    const [post] = await db.select().from(contentPosts).where(eq(contentPosts.id, postId)).limit(1)
-
-    if (!post) {
-      return {
-        success: false,
-        error: "Post not found",
-      }
-    }
-
-    // Return the current status and any images if they exist
-    let images = []
-    if (post.images) {
-      try {
-        const imagesData = JSON.parse(post.images)
-        images = imagesData.images?.images || imagesData.images || []
-
-        // Filter out placeholder images and blob URLs
-        images = images.filter((img: any) => {
-          return img && img.url && !img.url.includes("placeholder.svg") && !img.url.startsWith("blob:")
-        })
-      } catch (e) {
-        console.error("Error parsing images JSON:", e)
-      }
-    }
-
-    // Check if we have real images (not placeholders)
-    const hasRealImages = images.length > 0
-
-    return {
-      success: true,
-      data: {
-        status: post.image_status || "pending",
-        isComplete: post.image_status === "completed" || hasRealImages,
-        hasImages: hasRealImages,
-        images: images,
-        imageUrl: post.imageUrl,
-      },
-    }
-  } catch (error) {
-    console.error("Failed to check image generation status:", error)
-    return {
-      success: false,
-      error: "Failed to check image status: " + (error instanceof Error ? error.message : String(error)),
-    }
-  }
-}
-
-// Post to social media
 export async function postToSocialMedia(postId: number, platform: string, content: string) {
   try {
     console.log(`Posting to ${platform} for post ID ${postId}`)
