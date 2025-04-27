@@ -85,14 +85,14 @@
     "@neondatabase/serverless": "latest",
     "@cloudflare/workers-types": "latest",
     "@op-engineering/op-sqlite": "latest",
-    "@emotion/is-prop-valid": "latest",
     "ws": "latest",
+    "@emotion/is-prop-valid": "latest",
     "drizzle-orm": "latest",
     "drizzle-kit": "latest",
-    "framer-motion": "latest",
     "openai": "latest",
     "ai": "latest",
-    "@ai-sdk/cerebras": "latest"
+    "@ai-sdk/cerebras": "latest",
+    "framer-motion": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

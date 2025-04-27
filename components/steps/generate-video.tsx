@@ -355,9 +355,11 @@ export default function GenerateVideo({ posts, onComplete, onBack, skipIfNoImage
       </div>
 
       {!hasPostsWithImages && (
-        <div className="bg-yellow-100 border-4 border-black rounded-md p-6 text-center">
+        <div className="bg-yellow-100 border-4 border-black rounded-md p-6 text-center mb-6">
           <p className="text-lg font-bold mb-2">No posts with images available</p>
-          <p className="mb-4">You can continue without generating videos, or go back to add images first.</p>
+          <p className="mb-4">
+            You can still generate videos for posts without images, or go back to add images first.
+          </p>
           {skipIfNoImages && (
             <div className="flex justify-center gap-4">
               <button
@@ -365,12 +367,6 @@ export default function GenerateVideo({ posts, onComplete, onBack, skipIfNoImage
                 className="py-2 px-4 bg-gray-200 border-2 border-black rounded-md font-medium hover:bg-gray-300"
               >
                 Back to Images
-              </button>
-              <button
-                onClick={() => onComplete(localPosts)}
-                className="py-2 px-4 bg-green-400 border-2 border-black rounded-md font-medium hover:bg-green-500"
-              >
-                Skip to Next Step
               </button>
             </div>
           )}
@@ -411,6 +407,7 @@ export default function GenerateVideo({ posts, onComplete, onBack, skipIfNoImage
           const isGenerating = generatingPostId === post.id
           const hasVideo = post.videoUrl && post.videoUrl !== "/placeholder.mp4"
           const selectedImages = getSelectedImages(post)
+          const hasImages = selectedImages.length > 0
 
           return (
             <div key={post.id} className="border-4 border-black rounded-md p-4 bg-white">

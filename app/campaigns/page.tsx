@@ -13,7 +13,7 @@ import {
   Repeat,
   PauseCircle,
 } from "lucide-react"
-import { getAllCampaigns } from "@/lib/actions_api" // Changed from @/lib/actions to @/lib/actions_api
+import { getAllCampaigns } from "@/lib/actions" // Changed from @/lib/actions_api to @/lib/actions
 import RefreshButton from "@/components/refresh-button"
 
 export default function CampaignsPage() {

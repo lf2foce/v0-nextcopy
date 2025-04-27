@@ -4,6 +4,8 @@ import { db, executeWithRetry } from "./db"
 import { themes, contentPosts, campaigns } from "./schema"
 import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
+import { desc } from "drizzle-orm" // Add this import for getAllCampaigns
+import { getCampaignSteps } from "./campaign-steps" // Import campaign steps
 
 // Define campaign steps
 const CAMPAIGN_STEPS = {
@@ -54,20 +56,25 @@ export async function createCampaign(formData: any) {
   }
 }
 
-// Approve posts
+// Update the approvePosts function to handle multiple post IDs correctly
+
 export async function approvePosts(approvedPostIds: number[], disapprovedPostIds: number[] = []) {
   try {
     console.log("Approving posts with IDs:", approvedPostIds)
     console.log("Disapproving posts with IDs:", disapprovedPostIds)
 
-    // Update approved posts
+    // Update approved posts - handle multiple IDs
     if (approvedPostIds.length > 0) {
-      await db.update(contentPosts).set({ status: "approved" }).where(eq(contentPosts.id, approvedPostIds[0])) // Fix: Use eq for single ID
+      for (const postId of approvedPostIds) {
+        await db.update(contentPosts).set({ status: "approved" }).where(eq(contentPosts.id, postId))
+      }
     }
 
-    // Update disapproved posts
+    // Update disapproved posts - handle multiple IDs
     if (disapprovedPostIds.length > 0) {
-      await db.update(contentPosts).set({ status: "disapproved" }).where(eq(contentPosts.id, disapprovedPostIds[0])) // Fix: Use eq for single ID
+      for (const postId of disapprovedPostIds) {
+        await db.update(contentPosts).set({ status: "disapproved" }).where(eq(contentPosts.id, postId))
+      }
     }
 
     revalidatePath("/campaigns")
@@ -304,48 +311,6 @@ export async function getCampaignWithStep(campaignId: number) {
   }
 }
 
-// Update the generateThemes function to remove any fallbacks
-export async function generateThemes(campaignId: number) {
-  try {
-    // Call the API directly without any fallbacks
-    const response = await fetch(`/api/themes/generate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ campaignId }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to generate themes: ${response.status} ${response.statusText}`)
-    }
-
-    const data = await response.json()
-
-    if (!data.success) {
-      throw new Error(data.error || "API returned unsuccessful response")
-    }
-
-    return {
-      success: true,
-      data: data.themes || data.data,
-    }
-  } catch (error) {
-    console.error("Failed to generate themes:", error)
-    return {
-      success: false,
-      error: "Failed to generate themes: " + (error instanceof Error ? error.message : String(error)),
-    }
-  }
-}
-
-export async function selectTheme() {
-  return {
-    success: false,
-    error: "selectTheme is not implemented",
-  }
-}
-
 // Update campaign step
 export async function updateCampaignStep(campaignId: number, step: number) {
   try {
@@ -353,7 +318,8 @@ export async function updateCampaignStep(campaignId: number, step: number) {
 
     // Update both currentStep and status if needed
     let status = "draft"
-    if (step === CAMPAIGN_STEPS.SCHEDULED) {
+    if (step === 8) {
+      // Use hardcoded value instead of CAMPAIGN_STEPS.SCHEDULED
       status = "active" // Only set to active when fully scheduled (step 8)
     }
 
@@ -377,5 +343,54 @@ export async function updateCampaignStep(campaignId: number, step: number) {
       success: false,
       error: "Failed to update campaign step: " + (error instanceof Error ? error.message : String(error)),
     }
+  }
+}
+
+// Get all campaigns with status - moved from actions_api.ts
+export async function getAllCampaigns() {
+  try {
+    // Use standard select instead of query builder
+    const allCampaigns = await db.select().from(campaigns).orderBy(desc(campaigns.id))
+
+    // Determine UI status based on database status and currentStep
+    const mappedCampaigns = allCampaigns.map(async (campaign) => {
+      // Map status for UI:
+      // - "scheduled" for campaigns at step 8 (fully scheduled)
+      // - "draft" for all other campaigns (in progress/incomplete)
+      const steps = await getCampaignSteps()
+      const uiStatus = campaign.currentStep === steps.SCHEDULED ? "scheduled" : "draft"
+
+      return {
+        ...campaign,
+        status: uiStatus,
+        // Make sure isActive is included (default to true if not set)
+        isActive: campaign.isActive !== undefined ? campaign.isActive : true,
+      }
+    })
+
+    const resolvedCampaigns = await Promise.all(mappedCampaigns)
+
+    return { success: true, data: resolvedCampaigns }
+  } catch (error) {
+    console.error("Failed to get campaigns:", error)
+    return {
+      success: false,
+      error: "Failed to get campaigns: " + (error instanceof Error ? error.message : String(error)),
+    }
+  }
+}
+
+// These are placeholder implementations for functions that are actually implemented in actions_api.ts
+export async function generateThemes(campaignId: number) {
+  return {
+    success: false,
+    error: "generateThemes is not implemented in actions.ts, use the version from actions_api.ts",
+  }
+}
+
+export async function selectTheme(themeId: number) {
+  return {
+    success: false,
+    error: "selectTheme is not implemented in actions.ts, use the version from actions_api.ts",
   }
 }
