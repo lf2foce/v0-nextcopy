@@ -297,177 +297,6 @@ export async function checkThemePostStatus(themeId: number) {
   }
 }
 
-// Update the generateImagesForPost function to include imageService parameter
-// export async function generateImagesForPost(
-//   postId: number,
-//   numImages = 1,
-//   imageStyle = "realistic",
-//   imageService = "flux",
-// ) {
-//   try {
-//     console.log(
-//       `Generating ${numImages} images with style "${imageStyle}" using service "${imageService}" for post ${postId}`,
-//     )
-
-//     // Get the site URL from environment variables with a fallback
-//     const siteUrl = getSiteUrl()
-
-//     // Call our API route with absolute URL
-//     const response = await fetch(
-//       `${siteUrl}/api/posts/${postId}/generate-images?num_images=${numImages}&style=${encodeURIComponent(imageStyle)}&image_service=${encodeURIComponent(imageService)}`,
-//       {
-//         method: "POST",
-//         headers: {
-//           "Content-Type": "application/json",
-//         },
-//       },
-//     )
-
-//     // Handle non-JSON responses better
-//     if (!response.ok) {
-//       let errorMessage = `Failed to generate images: ${response.status} ${response.statusText}`
-
-//       try {
-//         const errorData = await response.json()
-//         errorMessage = errorData.error || errorMessage
-//       } catch (jsonError) {
-//         // If JSON parsing fails, try to get the response as text
-//         try {
-//           const errorText = await response.text()
-//           if (errorText) {
-//             errorMessage = `${errorMessage} - ${errorText.substring(0, 100)}`
-//           }
-//         } catch (textError) {
-//           // If even text extraction fails, use the default error message
-//         }
-//       }
-
-//       console.error("Error generating images:", errorMessage)
-//       return {
-//         success: false,
-//         error: errorMessage,
-//       }
-//     }
-
-//     // Parse the successful response
-//     try {
-//       const result = await response.json()
-//       console.log("API response for image generation:", result)
-
-//       // Check if this is a processing response (async generation started)
-//       if (result.data?.status === "processing") {
-//         return {
-//           success: true,
-//           data: {
-//             status: "processing",
-//             message: result.data.message || "Image generation started in background",
-//           },
-//         }
-//       }
-
-//       // If we have immediate results (unlikely but possible)
-//       if (result.data?.images && Array.isArray(result.data.images) && result.data.images.length > 0) {
-//         // Update the post with the new images
-//         try {
-//           const imageData = result.data.images
-
-//           // Use updatePostImages from actions.ts
-//           await updatePostImages([
-//             {
-//               id: postId,
-//               image: imageData[0]?.url || "",
-//             },
-//           ])
-
-//           // Also update the full images data
-//           await db
-//             .update(contentPosts)
-//             .set({
-//               images: JSON.stringify({
-//                 images: imageData.map((img: any, idx: number) => ({
-//                   ...img,
-//                   isSelected: true,
-//                   order: idx,
-//                 })),
-//               }),
-//               image_status: "completed",
-//             })
-//             .where(eq(contentPosts.id, postId))
-//         } catch (dbError) {
-//           console.error("Error updating post with new images:", dbError)
-//         }
-//       }
-
-//       return { success: true, data: result.data }
-//     } catch (parseError) {
-//       console.error("Error parsing JSON response:", parseError)
-//       return {
-//         success: false,
-//         error: `Failed to parse response: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-//       }
-//     }
-//   } catch (error) {
-//     console.error("Failed to generate images for post:", error)
-//     return {
-//       success: false,
-//       error: "Failed to generate images: " + (error instanceof Error ? error.message : String(error)),
-//     }
-//   }
-// }
-
-// Check image generation status for a post
-// export async function checkImageGenerationStatus(postId: number) {
-//   try {
-//     console.log(`Checking image generation status for post ${postId}`)
-
-//     // Get the post from the database to check its image_status
-//     const [post] = await db.select().from(contentPosts).where(eq(contentPosts.id, postId)).limit(1)
-
-//     if (!post) {
-//       return {
-//         success: false,
-//         error: "Post not found",
-//       }
-//     }
-
-//     // Return the current status and any images if they exist
-//     let images = []
-//     if (post.images) {
-//       try {
-//         const imagesData = JSON.parse(post.images)
-//         images = imagesData.images?.images || imagesData.images || []
-
-//         // Filter out placeholder images and blob URLs
-//         images = images.filter((img: any) => {
-//           return img && img.url && !img.url.includes("placeholder.svg") && !img.url.startsWith("blob:")
-//         })
-//       } catch (e) {
-//         console.error("Error parsing images JSON:", e)
-//       }
-//     }
-
-//     // Check if we have real images (not placeholders)
-//     const hasRealImages = images.length > 0
-
-//     return {
-//       success: true,
-//       data: {
-//         status: post.image_status || "pending",
-//         isComplete: post.image_status === "completed" || hasRealImages,
-//         hasImages: hasRealImages,
-//         images: images,
-//         imageUrl: post.imageUrl,
-//       },
-//     }
-//   } catch (error) {
-//     console.error("Failed to check image generation status:", error)
-//     return {
-//       success: false,
-//       error: "Failed to check image status: " + (error instanceof Error ? error.message : String(error)),
-//     }
-//   }
-// }
-
 // Check image generation status for a post
 export async function checkImageGenerationStatus(postId: number) {
   try {
@@ -507,13 +336,15 @@ export async function checkImageGenerationStatus(postId: number) {
     let isComplete = status === "completed" || hasRealImages
 
     // If status is "generating" but we have images, update status to "completed"
-    if (status === "generating" && hasRealImages) {
+    if ((status === "generating" || status === "pending") && hasRealImages) {
       // Update the status in the database
       await db.update(contentPosts).set({ image_status: "completed" }).where(eq(contentPosts.id, postId))
-
       status = "completed"
       isComplete = true
     }
+
+    // Log the result for debugging
+    console.log(`Post ${postId} status: ${status}, hasImages: ${hasRealImages}, imageCount: ${images.length}`)
 
     return {
       success: true,
@@ -533,129 +364,6 @@ export async function checkImageGenerationStatus(postId: number) {
     }
   }
 }
-
-// Post to social media
-// export async function postToSocialMedia(postId: number, platform: string, content: string) {
-//   try {
-//     console.log(`Posting to ${platform} for post ID ${postId}`)
-
-//     // Call the API route - note we're not using content parameter anymore
-//     const siteUrl = getSiteUrl()
-//     const response = await fetch(`${siteUrl}/api/social/${platform}/post`, {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//       },
-//       body: JSON.stringify({ postId }),
-//     })
-
-//     // Log the response status for debugging
-//     console.log(`API response status: ${response.status} ${response.statusText}`)
-
-//     // First check if the response is ok
-//     if (!response.ok) {
-//       // Try to parse as JSON, but handle text response if it's not valid JSON
-//       try {
-//         const errorData = await response.json()
-//         console.error("Error response data:", errorData)
-//         return {
-//           success: false,
-//           error: errorData.error || `Failed to post to ${platform}: ${response.status} ${response.statusText}`,
-//         }
-//       } catch (parseError) {
-//         // If JSON parsing fails, get the response as text instead
-//         try {
-//           const errorText = await response.text()
-//           console.error("Error response text:", errorText)
-//           return {
-//             success: false,
-//             error: `Failed to post to ${platform}: ${errorText.substring(0, 100)}...`,
-//           }
-//         } catch (textError) {
-//           // If even text extraction fails
-//           return {
-//             success: false,
-//             error: `Failed to post to ${platform}: ${response.status} ${response.statusText}`,
-//           }
-//         }
-//       }
-//     }
-
-//     // Try to parse the successful response as JSON
-//     try {
-//       const result = await response.json()
-//       console.log("Success response:", result)
-
-//       // Update the post status in our database if needed
-//       // This would be a good place to update the post status to "posted"
-
-//       return { success: true, data: result }
-//     } catch (parseError) {
-//       console.error("JSON parse error for successful response:", parseError)
-//       // If JSON parsing fails for a successful response, still return success
-//       return {
-//         success: true,
-//         data: { message: "Posted successfully, but response wasn't valid JSON" },
-//       }
-//     }
-//   } catch (error) {
-//     console.error(`Failed to post to ${platform}:`, error)
-//     return {
-//       success: false,
-//       error: `Failed to post to ${platform}: ${error instanceof Error ? error.message : String(error)}`,
-//     }
-//   }
-// }
-
-// Save image selection to database
-// export async function saveImageSelection(postId: number, images: string, mainImageUrl: string) {
-//   try {
-//     // Use updatePostImages from actions.ts
-//     await updatePostImages([{ id: postId, image: mainImageUrl }])
-
-//     // Update the full images data directly
-//     await db
-//       .update(contentPosts)
-//       .set({
-//         images: images,
-//         image_status: "completed",
-//       })
-//       .where(eq(contentPosts.id, postId))
-
-//     return { success: true }
-//   } catch (error) {
-//     console.error("Error saving image selection to database:", error)
-//     return {
-//       success: false,
-//       error: "Failed to save selection: " + (error instanceof Error ? error.message : String(error)),
-//     }
-//   }
-// }
-
-// Clear images for a post
-// export async function clearPostImages(postId: number, placeholderImages: any) {
-//   try {
-//     // Use updatePostImages from actions.ts
-//     await updatePostImages([{ id: postId, image: "" }])
-
-//     // Update the images data directly
-//     await db
-//       .update(contentPosts)
-//       .set({
-//         images: JSON.stringify({ images: placeholderImages }),
-//         image_status: "pending",
-//       })
-//       .where(eq(contentPosts.id, postId))
-
-//     return { success: true }
-//   } catch (error) {
-//     console.error("Error clearing images:", error)
-//     return {
-//       success: false,
-//       error: "Failed to clear images: " + (error instanceof Error ? error.message : String(error)),
-//     }
-//   }
-// }
 
 // Process image generation with error handling
 export async function processImageGeneration(
@@ -775,7 +483,7 @@ export async function processImageGeneration(
   }
 }
 
-// Check image generation status for a post
+// Post to social media
 export async function postToSocialMedia(postId: number, platform: string, content: string) {
   try {
     console.log(`Posting to ${platform} for post ID ${postId}`)
