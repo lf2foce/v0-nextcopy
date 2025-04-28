@@ -19,30 +19,60 @@ const CAMPAIGN_STEPS = {
   SCHEDULED: 8,
 }
 
-// Create a new campaign - without system prompt generation
-export async function createCampaign(formData: any) {
-  try {
-    console.log("Creating new campaign with data:", formData)
+// Find the createCampaign function and modify it to trigger system prompt generation
+// after creating the campaign but without awaiting its completion
 
-    // Map form data fields to database schema fields
-    const campaignData = {
-      title: formData.name,
-      description: formData.description,
-      targetCustomer: formData.target,
-      insight: formData.insight,
-      repeatEveryDays: formData.repeatEveryDays,
-      startDate: formData.startDate,
-      currentStep: 0,
-      status: "draft",
-      isActive: true,
+export async function createCampaign(campaignData: any) {
+  console.log("Creating campaign with data:", campaignData)
+
+  try {
+    // Validate required fields
+    if (!campaignData.name || !campaignData.description || !campaignData.target) {
+      return {
+        success: false,
+        error: "Missing required fields",
+      }
     }
 
-    // Insert the new campaign into the database with retry logic
-    const [newCampaign] = await executeWithRetry(() => db.insert(campaigns).values(campaignData).returning())
+    // Create campaign in database
+    const campaign = await db
+      .insert(campaigns)
+      .values({
+        title: campaignData.name,
+        description: campaignData.description,
+        targetCustomer: campaignData.target,
+        insight: campaignData.insight || null,
+        repeatEveryDays: campaignData.repeatEveryDays || 7,
+        startDate: campaignData.startDate ? new Date(campaignData.startDate) : new Date(),
+        currentStep: 1, // Set to DRAFT step
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning()
 
+    if (!campaign || campaign.length === 0) {
+      return {
+        success: false,
+        error: "Failed to create campaign",
+      }
+    }
+
+    const newCampaign = campaign[0]
     console.log("Campaign created successfully:", newCampaign)
 
-    // No system prompt generation here - moved to frontend
+    // Trigger system prompt generation in the background without awaiting
+    // This is the key change - we don't await this promise
+    generateSystemPrompt(newCampaign)
+      .then((result) => {
+        if (result.success) {
+          console.log("System prompt generated in background:", result.data)
+        } else {
+          console.error("Background system prompt generation failed:", result.error)
+        }
+      })
+      .catch((error) => {
+        console.error("Error in background system prompt generation:", error)
+      })
 
     revalidatePath("/campaigns")
 
@@ -51,10 +81,10 @@ export async function createCampaign(formData: any) {
       data: newCampaign,
     }
   } catch (error) {
-    console.error("Failed to create campaign:", error)
+    console.error("Error creating campaign:", error)
     return {
       success: false,
-      error: "Failed to create campaign: " + (error instanceof Error ? error.message : String(error)),
+      error: "An unexpected error occurred",
     }
   }
 }

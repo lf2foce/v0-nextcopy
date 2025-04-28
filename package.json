@@ -88,12 +88,12 @@
     "ws": "latest",
     "@emotion/is-prop-valid": "latest",
     "drizzle-orm": "latest",
-    "drizzle-kit": "latest",
     "openai": "latest",
     "ai": "latest",
     "@ai-sdk/cerebras": "latest",
-    "framer-motion": "latest",
-    "@ai-sdk/xai": "latest"
+    "@ai-sdk/xai": "latest",
+    "drizzle-kit": "latest",
+    "framer-motion": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

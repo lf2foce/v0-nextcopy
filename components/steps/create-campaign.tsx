@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import type { Campaign } from "../campaign-workflow"
-import { createCampaign, generateSystemPrompt } from "@/lib/actions"
+import { createCampaign } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2, AlertCircle, Sparkles } from "lucide-react"
 
@@ -98,12 +98,13 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
   const { toast } = useToast()
   const [apiError, setApiError] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
-  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false)
-  const [promptError, setPromptError] = useState<string | null>(null)
   const [fallbackDesc, setFallbackDesc] = useState<string>(
     fallbackDescriptions[Math.floor(Math.random() * fallbackDescriptions.length)],
   )
   const [usingFallback, setUsingFallback] = useState(false)
+  const [shouldFallback, setShouldFallback] = useState(false)
+  const [isFallbackEnabled, setIsFallbackEnabled] = useState(false)
+  const [hasAttemptedFallback, setHasAttemptedFallback] = useState(false)
 
   // Initialize form with initial data if provided
   useEffect(() => {
@@ -189,6 +190,13 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
     setUsingFallback(true)
   }, [toast, fallbackDesc])
 
+  useEffect(() => {
+    if (shouldFallback) {
+      useFallback()
+      setShouldFallback(false) // Reset the flag after using the fallback
+    }
+  }, [shouldFallback, useFallback])
+
   const generateDescription = async () => {
     setIsGenerating(true)
     setApiError(null)
@@ -198,7 +206,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
     let didFallback = false
     const attemptFallback = () => {
       if (!didFallback) {
-        useFallback()
+        setShouldFallback(true)
         didFallback = true
       }
     }
@@ -280,7 +288,6 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
-    setPromptError(null)
 
     try {
       // If we have an ID, we're editing an existing campaign
@@ -295,7 +302,8 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
       if (result.success && result.data) {
         toast({
           title: "Campaign created",
-          description: "Your campaign has been created successfully.",
+          description:
+            "Your campaign has been created successfully. System prompt will be generated in the background.",
         })
 
         // Make sure we're passing the complete campaign object with the ID from the database
@@ -306,39 +314,10 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
 
         console.log("Campaign created successfully with ID:", result.data.id)
 
-        // Generate system prompt after campaign creation
-        setIsGeneratingPrompt(true)
-        generateSystemPrompt(result.data)
-          .then((promptResult) => {
-            if (promptResult.success) {
-              console.log("System prompt generated successfully")
-            } else {
-              console.error("Failed to generate system prompt:", promptResult.error)
-              setPromptError(`System prompt generation failed: ${promptResult.error}`)
-
-              // Log detailed error information for debugging
-              if (promptResult.details) {
-                console.error("System prompt error details:", promptResult.details)
-              }
-
-              toast({
-                title: "System Prompt Generation Failed",
-                description:
-                  "The campaign was created, but we couldn't generate the system prompt. You can continue with the workflow.",
-                variant: "warning",
-              })
-            }
-          })
-          .catch((error) => {
-            console.error("Error generating system prompt:", error)
-            setPromptError(`Unexpected error: ${error instanceof Error ? error.message : String(error)}`)
-          })
-          .finally(() => {
-            setIsGeneratingPrompt(false)
-          })
-
-        // Call onSubmit with the updated campaign object
+        // Call onSubmit with the updated campaign object to proceed to the next step
         onSubmit(campaignWithId)
+
+        // System prompt generation is now handled in the createCampaign server action
       } else {
         toast({
           title: "Error",
@@ -392,21 +371,6 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
             <div>
               <h3 className="font-bold">API Error</h3>
               <p className="text-sm">{apiError}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {promptError && (
-        <div className="bg-red-100 border-4 border-black rounded-md p-4 mb-4">
-          <div className="flex items-start gap-2">
-            <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-1" />
-            <div>
-              <h3 className="font-bold">System Prompt Error</h3>
-              <p className="text-sm">{promptError}</p>
-              <p className="text-xs mt-1 text-gray-700">
-                Check the browser console for more detailed error information.
-              </p>
             </div>
           </div>
         </div>
