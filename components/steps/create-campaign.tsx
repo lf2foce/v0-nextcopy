@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import type { Campaign } from "../campaign-workflow"
-import { createCampaign } from "@/lib/actions"
+import { createCampaign, generateSystemPrompt } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2, AlertCircle, Sparkles } from "lucide-react"
 
@@ -98,9 +98,12 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
   const { toast } = useToast()
   const [apiError, setApiError] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false)
+  const [promptError, setPromptError] = useState<string | null>(null)
   const [fallbackDesc, setFallbackDesc] = useState<string>(
     fallbackDescriptions[Math.floor(Math.random() * fallbackDescriptions.length)],
   )
+  const [usingFallback, setUsingFallback] = useState(false)
 
   // Initialize form with initial data if provided
   useEffect(() => {
@@ -183,13 +186,22 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
       description: "Could not connect to AI service. Using a fallback description instead.",
       variant: "destructive",
     })
+    setUsingFallback(true)
   }, [toast, fallbackDesc])
 
   const generateDescription = async () => {
     setIsGenerating(true)
     setApiError(null)
+    setUsingFallback(false)
 
-    // Use a fallback description right away if there's an API error
+    // Immediately use fallback if there's an API error
+    let didFallback = false
+    const attemptFallback = () => {
+      if (!didFallback) {
+        useFallback()
+        didFallback = true
+      }
+    }
 
     try {
       console.log("Sending request to generate description", {
@@ -200,7 +212,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
       const timeoutId = setTimeout(() => {
         if (isGenerating) {
           setApiError("Request timed out")
-          useFallback()
+          attemptFallback()
           setIsGenerating(false)
         }
       }, 10000) // 10 second timeout
@@ -223,7 +235,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
         if (response.status === 500) {
           console.error("Server error (500) when generating description")
           setApiError("AI service unavailable")
-          useFallback()
+          attemptFallback()
           return
         }
 
@@ -259,7 +271,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
       setApiError(errorMessage)
 
       // Use fallback description if API fails
-      useFallback()
+      attemptFallback()
     } finally {
       setIsGenerating(false)
     }
@@ -268,6 +280,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setPromptError(null)
 
     try {
       // If we have an ID, we're editing an existing campaign
@@ -292,6 +305,37 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
         }
 
         console.log("Campaign created successfully with ID:", result.data.id)
+
+        // Generate system prompt after campaign creation
+        setIsGeneratingPrompt(true)
+        generateSystemPrompt(result.data)
+          .then((promptResult) => {
+            if (promptResult.success) {
+              console.log("System prompt generated successfully")
+            } else {
+              console.error("Failed to generate system prompt:", promptResult.error)
+              setPromptError(`System prompt generation failed: ${promptResult.error}`)
+
+              // Log detailed error information for debugging
+              if (promptResult.details) {
+                console.error("System prompt error details:", promptResult.details)
+              }
+
+              toast({
+                title: "System Prompt Generation Failed",
+                description:
+                  "The campaign was created, but we couldn't generate the system prompt. You can continue with the workflow.",
+                variant: "warning",
+              })
+            }
+          })
+          .catch((error) => {
+            console.error("Error generating system prompt:", error)
+            setPromptError(`Unexpected error: ${error instanceof Error ? error.message : String(error)}`)
+          })
+          .finally(() => {
+            setIsGeneratingPrompt(false)
+          })
 
         // Call onSubmit with the updated campaign object
         onSubmit(campaignWithId)
@@ -348,6 +392,33 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
             <div>
               <h3 className="font-bold">API Error</h3>
               <p className="text-sm">{apiError}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {promptError && (
+        <div className="bg-red-100 border-4 border-black rounded-md p-4 mb-4">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-1" />
+            <div>
+              <h3 className="font-bold">System Prompt Error</h3>
+              <p className="text-sm">{promptError}</p>
+              <p className="text-xs mt-1 text-gray-700">
+                Check the browser console for more detailed error information.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {usingFallback && (
+        <div className="bg-orange-100 border-4 border-black rounded-md p-4 mb-4">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={20} className="text-orange-600 flex-shrink-0 mt-1" />
+            <div>
+              <h3 className="font-bold">Using Fallback Description</h3>
+              <p className="text-sm">The AI service is currently unavailable. A fallback description is being used.</p>
             </div>
           </div>
         </div>

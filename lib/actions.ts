@@ -19,7 +19,7 @@ const CAMPAIGN_STEPS = {
   SCHEDULED: 8,
 }
 
-// Create a new campaign
+// Create a new campaign - without system prompt generation
 export async function createCampaign(formData: any) {
   try {
     console.log("Creating new campaign with data:", formData)
@@ -41,6 +41,9 @@ export async function createCampaign(formData: any) {
     const [newCampaign] = await executeWithRetry(() => db.insert(campaigns).values(campaignData).returning())
 
     console.log("Campaign created successfully:", newCampaign)
+
+    // No system prompt generation here - moved to frontend
+
     revalidatePath("/campaigns")
 
     return {
@@ -392,5 +395,154 @@ export async function selectTheme(themeId: number) {
   return {
     success: false,
     error: "selectTheme is not implemented in actions.ts, use the version from actions_api.ts",
+  }
+}
+
+// Add this new server action at the end of the file
+
+// Generate system prompt for a campaign
+export async function generateSystemPrompt(campaignData: any) {
+  try {
+    console.log("Generating system prompt for campaign:", campaignData.id, campaignData.title)
+
+    // Validate campaign data
+    if (!campaignData || !campaignData.id) {
+      console.error("Invalid campaign data:", campaignData)
+      return {
+        success: false,
+        error: "Invalid campaign data: Missing required fields",
+        details: { campaignData },
+      }
+    }
+
+    // Get the base URL for API calls
+    // Get the base URL for API calls - ensure it's properly formatted
+    // In browser environments like v0 preview, we can use relative URLs
+    const isServerEnvironment = typeof window === "undefined"
+    let apiUrl
+
+    if (isServerEnvironment) {
+      // Server-side: construct full URL
+      let baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL || "http://localhost:3000"
+
+      // Ensure the URL doesn't have a trailing slash
+      if (baseUrl.endsWith("/")) {
+        baseUrl = baseUrl.slice(0, -1)
+      }
+
+      // Ensure the URL has http:// or https:// prefix
+      if (!baseUrl.startsWith("http")) {
+        baseUrl = `https://${baseUrl}`
+      }
+
+      apiUrl = `${baseUrl}/api/campaigns/generate-system-prompt`
+    } else {
+      // Client-side: use relative URL
+      apiUrl = "/api/campaigns/generate-system-prompt"
+    }
+
+    console.log("Using API URL for system prompt generation:", apiUrl)
+
+    // Call the API route to generate the system prompt
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ campaignData }),
+        cache: "no-store", // Ensure we're not getting a cached response
+      })
+
+      // Log response status
+      console.log("API response status:", response.status)
+
+      // Handle non-OK responses
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "Could not read error response body")
+        console.error("API error response:", response.status, errorText)
+
+        return {
+          success: false,
+          error: `API error (${response.status}): ${response.statusText}`,
+          details: {
+            status: response.status,
+            statusText: response.statusText,
+            body: errorText.substring(0, 500), // Limit error text length
+          },
+        }
+      }
+
+      // Parse the JSON response
+      let result
+      try {
+        result = await response.json()
+      } catch (parseError) {
+        console.error("Failed to parse API response as JSON:", parseError)
+        return {
+          success: false,
+          error: "Failed to parse API response as JSON",
+          details: { parseError: parseError instanceof Error ? parseError.message : String(parseError) },
+        }
+      }
+
+      // Check if the result indicates success
+      if (!result.success) {
+        console.error("API returned error:", result.error)
+        return {
+          success: false,
+          error: `API returned error: ${result.error || "Unknown error"}`,
+          details: result,
+        }
+      }
+
+      // Validate the result data
+      if (!result.data) {
+        console.error("API response missing data:", result)
+        return {
+          success: false,
+          error: "API response missing data",
+          details: result,
+        }
+      }
+
+      // Update the campaign with the generated system prompt data
+      try {
+        await db
+          .update(campaigns)
+          .set({
+            campaignData: JSON.stringify(result.data),
+          })
+          .where(eq(campaigns.id, campaignData.id))
+
+        console.log("System prompt data saved successfully for campaign:", campaignData.id)
+      } catch (dbError) {
+        console.error("Database error when saving campaign data:", dbError)
+        return {
+          success: false,
+          error: "Failed to save system prompt data to database",
+          details: { dbError: dbError instanceof Error ? dbError.message : String(dbError) },
+        }
+      }
+
+      return {
+        success: true,
+        data: result.data,
+      }
+    } catch (fetchError) {
+      console.error("Fetch error when calling API:", fetchError)
+      return {
+        success: false,
+        error: "Network error when generating system prompt",
+        details: { fetchError: fetchError instanceof Error ? fetchError.message : String(fetchError) },
+      }
+    }
+  } catch (error) {
+    console.error("Unexpected error in generateSystemPrompt:", error)
+    return {
+      success: false,
+      error: "Unexpected error in generateSystemPrompt",
+      details: { error: error instanceof Error ? error.stack : String(error) },
+    }
   }
 }
