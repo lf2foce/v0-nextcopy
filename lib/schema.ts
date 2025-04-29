@@ -58,6 +58,7 @@ export const contentPosts = pgTable("content_posts", {
   images: text("images"), // This will store JSON string of multiple images
   defaultImageIndex: integer("default_image_index").default(0), // Index of the default image
   image_status: text("image_status").default("pending"), // Add image_status field with default "pending"
+  post_metadata: text("post_metadata"), // Thêm trường post_metadata để lưu trữ metadata của bài đăng
 })
 
 // Define relations
@@ -94,3 +95,12 @@ export type NewTheme = typeof themes.$inferInsert
 
 export type ContentPost = typeof contentPosts.$inferSelect
 export type NewContentPost = typeof contentPosts.$inferInsert
+
+// Thêm type cho post_metadata
+export interface PostMetadata {
+  goals?: string
+  content_type?: string
+  content_ideas?: string
+  content_length?: number
+  [key: string]: any // Cho phép các trường khác
+}

@@ -7,6 +7,7 @@ import PostModal from "../ui/post-modal"
 import { approvePosts, fetchPostsForTheme } from "@/lib/actions"
 import { checkThemePostStatus } from "@/lib/actions_api" // Updated import
 import { useToast } from "@/hooks/use-toast"
+import type { PostMetadata } from "@/lib/schema"
 
 interface GenerateApproveContentProps {
   campaign: Campaign
@@ -292,6 +293,30 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
   const themeName = theme.title || theme.name || "Theme"
   const themeDescription = theme.story || theme.description || ""
 
+  // Parse post_metadata
+  const parsePostMetadata = (post: Post): PostMetadata | null => {
+    if (!post.post_metadata) return null
+
+    try {
+      if (typeof post.post_metadata === "string") {
+        return JSON.parse(post.post_metadata)
+      }
+      return post.post_metadata as PostMetadata
+    } catch (e) {
+      console.error("Error parsing post metadata:", e)
+      return null
+    }
+  }
+
+  // Get content type from post_metadata
+  const getContentType = (post: Post): string => {
+    const metadata = parsePostMetadata(post)
+    if (metadata && metadata.content_type) {
+      return metadata.content_type
+    }
+    return "Story" // Fallback to default
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -360,6 +385,7 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
               const isSelected = selectedPostIds.has(post.id)
               const isRegenerating = regeneratingPostId === post.id
               const day = index + 1
+              const contentType = getContentType(post)
 
               return (
                 <div
@@ -367,9 +393,11 @@ export default function GenerateApproveContent({ campaign, theme, onApprove, onB
                   className={`border-4 ${isSelected ? "border-green-500" : "border-black"} rounded-md p-4 hover:bg-gray-50 transition-all ${isRegenerating ? "opacity-70" : ""}`}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-bold text-lg">Day {day}</h4>
+                    <h4 className="font-bold text-lg">
+                      Day {day} - {post.title || "Untitled Post"}
+                    </h4>
                     <div className="bg-blue-200 px-3 py-1 border-2 border-black rounded-md text-sm font-medium">
-                      Story
+                      {contentType}
                     </div>
                   </div>
 
