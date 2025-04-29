@@ -530,7 +530,7 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
           return (
             <div key={post.id} className="border-4 border-black rounded-md overflow-hidden bg-white">
               <div className="p-4 bg-yellow-100 border-b-4 border-black flex justify-between items-center">
-                <h3 className="font-bold text-lg">Post {index + 1}</h3>
+                <h3 className="font-bold text-lg">{post.title || `Post ${index + 1}`}</h3>
                 <div className="flex gap-2">
                   {!isEditing && (
                     <button

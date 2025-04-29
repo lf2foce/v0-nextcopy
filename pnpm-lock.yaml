@@ -49,7 +49,7 @@ importers:
         version: 1.19.0
       '@prisma/client':
         specifier: latest
-        version: 6.6.0(typescript@5.0.2)
+        version: 6.7.0(typescript@5.0.2)
       '@radix-ui/react-accordion':
         specifier: 1.2.2
         version: 1.2.2(@types/react-dom@19.0.0)(@types/react@19.0.0)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -178,7 +178,7 @@ importers:
         version: 0.31.0
       drizzle-orm:
         specifier: latest
-        version: 0.43.1(d751825b6e26e69d017b6699a8b55c16)
+        version: 0.43.1(f427b706d23c1ef7897a382d61e018fd)
       embla-carousel-react:
         specifier: 8.5.1
         version: 8.5.1(react@19.0.0)
@@ -1900,8 +1900,8 @@ packages:
     resolution: {integrity: sha512-Tv4jcFUFAFjOWrGSio49H6R2ijALv0ZzVBfJKIdm+kl9X046Fh4LLawrF9OMsglVbK6ukqMJsUCeucGAFTBcMA==}
     engines: {node: '>=16'}
 
-  '@prisma/client@6.6.0':
-    resolution: {integrity: sha512-vfp73YT/BHsWWOAuthKQ/1lBgESSqYqAWZEYyTdGXyFAHpmewwWL2Iz6ErIzkj4aHbuc6/cGSsE6ZY+pBO04Cg==}
+  '@prisma/client@6.7.0':
+    resolution: {integrity: sha512-+k61zZn1XHjbZul8q6TdQLpuI/cvyfil87zqK2zpreNIXyXtpUv3+H/oM69hcsFcZXaokHJIzPAt5Z8C8eK2QA==}
     engines: {node: '>=18.18'}
     peerDependencies:
       prisma: '*'
@@ -8477,7 +8477,7 @@ snapshots:
 
   '@planetscale/database@1.19.0': {}
 
-  '@prisma/client@6.6.0(typescript@5.0.2)':
+  '@prisma/client@6.7.0(typescript@5.0.2)':
     optionalDependencies:
       typescript: 5.0.2
 
@@ -10527,7 +10527,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.43.1(d751825b6e26e69d017b6699a8b55c16):
+  drizzle-orm@0.43.1(f427b706d23c1ef7897a382d61e018fd):
     optionalDependencies:
       '@aws-sdk/client-rds-data': 3.798.0
       '@cloudflare/workers-types': 4.20250429.0
@@ -10538,7 +10538,7 @@ snapshots:
       '@op-engineering/op-sqlite': 12.0.2(react-native@0.79.1(@babel/core@7.26.10)(@types/react@19.0.0)(bufferutil@4.0.9)(react@19.0.0))(react@19.0.0)
       '@opentelemetry/api': 1.9.0
       '@planetscale/database': 1.19.0
-      '@prisma/client': 6.6.0(typescript@5.0.2)
+      '@prisma/client': 6.7.0(typescript@5.0.2)
       '@tidbcloud/serverless': 0.2.0
       '@types/better-sqlite3': 7.6.13
       '@types/pg': 8.11.14

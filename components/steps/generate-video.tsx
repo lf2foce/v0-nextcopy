@@ -414,7 +414,7 @@ export default function GenerateVideo({ posts, onComplete, onBack, skipIfNoImage
               <div className="flex flex-col gap-4">
                 {/* Add post title/ID in the header */}
                 <div className="p-4 bg-yellow-100 border-b-4 border-black flex justify-between items-center">
-                  <h3 className="font-bold text-lg">Post {index + 1}</h3>
+                  <h3 className="font-bold text-lg">{post.title || `Post ${index + 1}`}</h3>
                   <div className="flex items-center gap-2">
                     {hasVideo && (
                       <span className="flex items-center gap-1 text-green-600">

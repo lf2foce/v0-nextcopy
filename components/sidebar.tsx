@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Flag, Palette, FileText, PlusCircle, Menu, X, Database } from "lucide-react"
+import { LayoutDashboard, Flag, PlusCircle, Menu, X, Database } from "lucide-react"
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -13,8 +13,9 @@ export default function Sidebar() {
   // Check if we're on mobile and close sidebar by default
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
-      if (window.innerWidth < 768) {
+      setIsMobile(window.innerWidth < 1024) // Changed from 768 to 1024 to include medium viewport
+      if (window.innerWidth < 1024) {
+        // Changed from 768 to 1024
         setIsOpen(false)
       } else {
         setIsOpen(true)
@@ -37,10 +38,10 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile menu button - fixed to the top left with yellow background */}
+      {/* Mobile menu button - fixed to the top left with green background */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="md:hidden fixed top-4 left-4 z-50 bg-yellow-300 p-2 rounded-md border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+        className="lg:hidden fixed top-4 left-4 z-50 bg-green-400 p-2 rounded-md border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
         aria-label="Toggle menu"
       >
         {isOpen ? <X size={20} /> : <Menu size={20} />}
@@ -53,7 +54,7 @@ export default function Sidebar() {
       <aside
         className={`${
           isOpen ? "translate-x-0" : "-translate-x-full"
-        } fixed md:sticky top-0 left-0 z-40 h-screen bg-white border-r-4 border-black transition-transform duration-300 ease-in-out w-64 md:translate-x-0 shadow-lg`}
+        } fixed lg:sticky top-0 left-0 z-40 h-screen bg-white border-r-4 border-black transition-transform duration-300 ease-in-out w-64 lg:translate-x-0 shadow-lg`}
       >
         <div className="border-b border-black/10">
           <div className="p-4 pt-12 md:pt-4">
@@ -90,31 +91,7 @@ export default function Sidebar() {
               <span>Campaigns</span>
             </Link>
 
-            <Link
-              href="/templates"
-              className={`flex items-center w-full py-3 px-4 rounded-md font-medium transition-colors ${
-                isActive("/templates")
-                  ? "bg-yellow-300 border-2 border-black"
-                  : "hover:bg-gray-100 border-2 border-transparent"
-              }`}
-              onClick={() => isMobile && setIsOpen(false)}
-            >
-              <Palette className="mr-2" size={20} />
-              <span>Templates</span>
-            </Link>
-
-            <Link
-              href="/content"
-              className={`flex items-center w-full py-3 px-4 rounded-md font-medium transition-colors ${
-                isActive("/content")
-                  ? "bg-yellow-300 border-2 border-black"
-                  : "hover:bg-gray-100 border-2 border-transparent"
-              }`}
-              onClick={() => isMobile && setIsOpen(false)}
-            >
-              <FileText className="mr-2" size={20} />
-              <span>Content</span>
-            </Link>
+            {/* Templates and Content links removed */}
 
             <Link
               href="/admin"
@@ -144,7 +121,7 @@ export default function Sidebar() {
       </aside>
 
       {/* Add padding to compensate for the fixed mobile menu button - increased margin */}
-      <div className="md:hidden h-16"></div>
+      <div className="lg:hidden h-16"></div>
     </>
   )
 }
