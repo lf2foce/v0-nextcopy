@@ -2,19 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import Image from "next/image"
-import {
-  ArrowLeft,
-  FileText,
-  Instagram,
-  ThumbsUp,
-  Calendar,
-  PauseCircle,
-  PlayCircle,
-  Trash2,
-  Clock,
-  Users,
-} from "lucide-react"
+import { ArrowLeft, Calendar, PauseCircle, PlayCircle, Trash2, Clock, Users } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toggleCampaignActiveStatus } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
@@ -90,8 +78,8 @@ export default function CampaignDetailClient({ initialCampaign }: { initialCampa
   // Get the selected theme
   const selectedTheme = campaign.selectedTheme || {}
 
-  // Get posts with content - prioritize approved posts, then posts with images
-  const postsWithContent = campaign.approvedPosts?.length ? campaign.approvedPosts : campaign.postsWithImages || []
+  // Get all posts except disapproved ones
+  const postsWithContent = campaign.allPosts?.filter((post: any) => post.status !== "disapproved") || []
 
   // Calculate total posts count
   const totalPosts = postsWithContent.length
@@ -211,98 +199,52 @@ export default function CampaignDetailClient({ initialCampaign }: { initialCampa
             )}
           </div>
 
-          {/* Content Preview */}
-          <div className="bg-white border-4 border-black rounded-lg p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Content Preview</h2>
+          {/* Content Preview Section */}
+          <div className="border-4 border-black rounded-lg overflow-hidden">
+            <div className="flex justify-between items-center p-4 bg-white border-b-4 border-black">
+              <h2 className="text-xl font-bold">Content Preview</h2>
               <Link
                 href={`/campaigns/${campaign.id}/content`}
-                className="py-2 px-4 bg-[#60a5fa] border-2 border-black rounded-md font-medium hover:bg-[#3b82f6] text-white"
+                className="py-2 px-4 bg-blue-400 border-2 border-black rounded-md hover:bg-blue-500 text-sm font-medium"
               >
                 View All Content
               </Link>
             </div>
-
-            {postsWithContent.length > 0 ? (
-              <div className="space-y-4">
-                {postsWithContent.slice(0, 2).map((post: any, index: number) => (
-                  <div key={post.id} className="border-2 border-black rounded-md overflow-hidden">
-                    <div className="flex flex-col md:flex-row">
-                      {post.image || post.imageUrl ? (
-                        <div className="w-full md:w-1/3 relative h-64 md:h-auto">
-                          <Image src={post.image || post.imageUrl} alt="Post preview" fill className="object-cover" />
-                        </div>
-                      ) : (
-                        <div className="w-full md:w-1/3 bg-gray-100 flex items-center justify-center relative h-64 md:h-auto">
-                          <div className="text-gray-500 text-center p-4">
-                            <FileText size={48} className="mx-auto mb-2" />
-                            <p>Text-only post</p>
-                          </div>
-                        </div>
-                      )}
-                      <div className="p-4 flex-1 relative">
-                        {post.status === "scheduled" && (
-                          <div className="absolute top-4 right-4">
-                            <span className="py-1 px-3 bg-green-200 border-2 border-black rounded-md text-sm font-medium">
-                              Scheduled
+            <div className="bg-gray-50 p-4">
+              {postsWithContent && postsWithContent.length > 0 ? (
+                <div className="space-y-4">
+                  {postsWithContent
+                    .filter((post) => post.status !== "disapproved")
+                    .map((post, index) => (
+                      <div key={post.id} className="bg-white border-2 border-black rounded-md p-4">
+                        <h3 className="font-bold text-lg mb-2">{post.title || `Post ${index + 1}`}</h3>
+                        <p className="text-gray-700 line-clamp-3">{post.content}</p>
+                        {post.status && (
+                          <div className="mt-2">
+                            <span
+                              className={`inline-block px-2 py-1 text-xs rounded-md ${
+                                post.status === "approved"
+                                  ? "bg-green-100 text-green-800"
+                                  : post.status === "scheduled"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : post.status === "published"
+                                      ? "bg-purple-100 text-purple-800"
+                                      : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {post.status.charAt(0).toUpperCase() + post.status.slice(1)}
                             </span>
                           </div>
                         )}
-
-                        <h3 className="text-xl font-bold mb-2">{campaign.name || campaign.title}</h3>
-                        <p className="text-lg mb-4">{post.content}</p>
-
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {post.content
-                            .split(" ")
-                            .filter((word: string) => word.startsWith("#"))
-                            .map((hashtag: string, index: number) => (
-                              <span
-                                key={index}
-                                className="py-1 px-3 bg-yellow-100 border-2 border-black rounded-md text-sm font-medium"
-                              >
-                                {hashtag}
-                              </span>
-                            ))}
-                        </div>
-
-                        <div className="flex items-center gap-4 text-sm text-gray-600 mt-4">
-                          <div className="flex items-center gap-1">
-                            <Instagram size={16} className="flex-shrink-0" />
-                            <span>Instagram</span>
-                          </div>
-
-                          {post.scheduledDate && (
-                            <div className="flex items-center gap-1">
-                              <Calendar size={16} className="flex-shrink-0" />
-                              <span>
-                                {post.scheduledDate instanceof Date
-                                  ? post.scheduledDate.toLocaleDateString()
-                                  : new Date(post.scheduledDate).toLocaleDateString()}
-                              </span>
-                            </div>
-                          )}
-
-                          <div className="flex items-center gap-1">
-                            <ThumbsUp size={16} className="flex-shrink-0" />
-                            <span>{Math.floor(Math.random() * 300) + 100} likes</span>
-                          </div>
-
-                          <div className="flex items-center gap-1">
-                            <FileText size={16} className="flex-shrink-0" />
-                            <span>Post #{index + 1}</span>
-                          </div>
-                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-gray-100 border-4 border-black rounded-lg p-6 text-center">
-                <p className="text-gray-700">No approved content is available for this campaign yet.</p>
-              </div>
-            )}
+                    ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No content available yet</p>
+                </div>
+              )}
+            </div>
           </div>
 
           <CampaignWorkflow

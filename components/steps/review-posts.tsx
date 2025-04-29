@@ -8,6 +8,9 @@ import { updatePostContent, updatePostImages, updatePostVideos, completeReview }
 import { useToast } from "@/hooks/use-toast"
 // First, import the new ImageViewerModal component
 import ImageViewerModal from "../ui/image-viewer-modal"
+// Update the toggleImageSelection function to use saveImageSelection from actions_api.ts
+// Add this import at the top of the file if it's not already there
+import { saveImageSelection } from "@/lib/actions_api"
 
 interface ReviewPostsProps {
   posts: Post[]
@@ -101,6 +104,25 @@ const getSelectedImages = (post: Post) => {
   try {
     const imagesData = JSON.parse(post.images)
     return (imagesData.images || []).filter((img: any) => img.isSelected === true)
+  } catch (e) {
+    console.error("Error parsing images JSON:", e)
+
+    // Fallback to single image if JSON parsing fails
+    if (post.image || post.imageUrl) {
+      return [{ url: post.image || post.imageUrl, isSelected: true }]
+    }
+
+    return []
+  }
+}
+
+// Helper function to get all images from a post
+const getAllImages = (post: Post) => {
+  if (!post.images) return []
+
+  try {
+    const imagesData = JSON.parse(post.images)
+    return imagesData.images || []
   } catch (e) {
     console.error("Error parsing images JSON:", e)
 
@@ -451,47 +473,81 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
     setViewerOpen(false)
   }
 
-  const toggleImageSelection = async (postId: string | number, imageIndex: number, postImages: any[]) => {
+  // Replace the toggleImageSelection function with this implementation
+  const toggleImageSelection = async (postId: number, imageIndex: number) => {
     try {
-      const post = localPosts.find((p) => p.id === postId)
-      if (!post || !post.images) return
+      // Find the post in the local state
+      const postIndex = localPosts.findIndex((p) => p.id === postId)
+      if (postIndex === -1) return
 
-      const imagesData = JSON.parse(post.images)
-      const updatedImages = [...imagesData.images]
+      // Create a copy of the post to modify
+      const post = { ...localPosts[postIndex] }
 
-      // Toggle the isSelected property of the clicked image
-      updatedImages[imageIndex].isSelected = !updatedImages[imageIndex].isSelected
-
-      // Update the images data in the local state
-      setLocalPosts((prevPosts) =>
-        prevPosts.map((p) =>
-          p.id === postId
-            ? {
-                ...p,
-                images: JSON.stringify({ images: updatedImages }),
-              }
-            : p,
-        ),
-      )
-
-      // Update the images in the database if it has a numeric ID
-      if (typeof postId === "number") {
-        const result = await updatePostImages([{ id: postId, images: JSON.stringify({ images: updatedImages }) }])
-
-        if (!result.success) {
-          toast({
-            title: "Warning",
-            description: "Image selection updated locally but not saved to database",
-          })
-        }
+      // Parse the current images JSON
+      let imagesData
+      try {
+        imagesData = post.images ? JSON.parse(post.images) : { images: [] }
+      } catch (e) {
+        console.error("Error parsing images JSON:", e)
+        imagesData = { images: [] }
       }
+
+      // Make sure images array exists
+      if (!imagesData.images) {
+        imagesData.images = []
+      }
+
+      // Toggle the selection state of the clicked image
+      if (imagesData.images[imageIndex]) {
+        imagesData.images[imageIndex].isSelected = !imagesData.images[imageIndex].isSelected
+      }
+
+      // Find the first selected image to use as the main image
+      let mainImageUrl = ""
+      const selectedImage = imagesData.images.find((img: any) => img.isSelected)
+      if (selectedImage) {
+        mainImageUrl = selectedImage.url
+      }
+
+      // Update the images JSON string
+      const updatedImagesJson = JSON.stringify(imagesData)
+
+      // Update the post in local state
+      const updatedPost = {
+        ...post,
+        images: updatedImagesJson,
+        imageUrl: mainImageUrl,
+        image: mainImageUrl,
+      }
+
+      // Update the local state
+      const updatedPosts = [...localPosts]
+      updatedPosts[postIndex] = updatedPost
+      setLocalPosts(updatedPosts)
+
+      // Save to database using saveImageSelection
+      await saveImageSelection(postId, updatedImagesJson, mainImageUrl)
+
+      // Show success toast
+      toast({
+        title: "Image selection updated",
+        description: "Your image selection has been saved.",
+      })
     } catch (error) {
       console.error("Error toggling image selection:", error)
       toast({
         title: "Error",
-        description: "Failed to toggle image selection",
+        description: "Failed to update image selection.",
+        variant: "destructive",
       })
     }
+  }
+
+  // Helper function to check if a video is valid and available
+  const isVideoAvailable = (videoUrl: string | null | undefined): boolean => {
+    if (!videoUrl) return false
+    if (videoUrl === "/placeholder.mp4") return false
+    return true
   }
 
   if (validPosts.length === 0) {
@@ -524,8 +580,10 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
           const isRegeneratingPost = regeneratingPostId === post.id
           const isRegeneratingImage = regeneratingImageId === post.id
           const isRegeneratingVideo = regeneratingVideoId === post.id
-          const hasVideo = post.videoUrl && post.videoUrl !== "/placeholder.mp4"
-          const selectedImages = getSelectedImages(post)
+          const hasVideo = isVideoAvailable(post.videoUrl)
+
+          // Get all images for this post (not just selected ones)
+          const allImages = getAllImages(post)
 
           return (
             <div key={post.id} className="border-4 border-black rounded-md overflow-hidden bg-white">
@@ -605,44 +663,17 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
                   )}
                 </div>
 
-                {/* Images row - ONLY SHOW IF ACTUAL IMAGES EXIST */}
-                {!isEditing &&
-                  (() => {
-                    let postImages = []
-                    let hasRealImages = false
-
-                    try {
-                      if (post.images) {
-                        const imagesData = JSON.parse(post.images)
-                        postImages = imagesData.images || []
-                        // Check if we have any non-placeholder images
-                        hasRealImages = postImages.some(
-                          (img) => img.url && !img.isPlaceholder && img.url !== "/placeholder.svg",
-                        )
-                      } else if (post.image || post.imageUrl) {
-                        // Fallback to single image if it exists
-                        postImages = [{ url: post.image || post.imageUrl, isSelected: true }]
-                        hasRealImages = true
-                      }
-                    } catch (e) {
-                      console.error("Error parsing images:", e)
-                      // If JSON parsing fails, fallback to single image if it exists
-                      if (post.image || post.imageUrl) {
-                        postImages = [{ url: post.image || post.imageUrl, isSelected: true }]
-                        hasRealImages = true
-                      }
-                    }
-
-                    // If no real images, don't show the image section at all
-                    if (!hasRealImages || postImages.length === 0) {
-                      return null
-                    }
-
-                    // Rest of the image section code
-                    return (
-                      <div className="px-4 mb-4">
+                {/* Images row - Show all images with selection state */}
+                {!isEditing && (
+                  <div className="px-4 mb-4">
+                    {allImages.length === 0 ? (
+                      <div className="bg-gray-100 border-2 border-black rounded-md p-3">
+                        <p className="text-gray-600">No images available for this post</p>
+                      </div>
+                    ) : (
+                      <>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {postImages.map((image, imageIndex) => (
+                          {allImages.map((image, imageIndex) => (
                             <div
                               key={imageIndex}
                               className={`relative border-4 ${
@@ -651,10 +682,10 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
                               onClick={(e) => {
                                 // If holding Ctrl/Cmd key, toggle selection, otherwise open viewer
                                 if (e.ctrlKey || e.metaKey) {
-                                  toggleImageSelection(post.id, imageIndex, postImages)
+                                  toggleImageSelection(post.id, imageIndex)
                                 } else {
                                   // Open image viewer with all images, starting at this index
-                                  openImageViewer(postImages, imageIndex)
+                                  openImageViewer(allImages, imageIndex)
                                 }
                               }}
                             >
@@ -690,27 +721,31 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
                             New Image
                           </button>
                         </div>
-                      </div>
-                    )
-                  })()}
+                      </>
+                    )}
+                  </div>
+                )}
 
-                {/* Video status - only show if video exists */}
-                {!isEditing && post.videoUrl && (
+                {/* Video status - show appropriate UI based on video availability */}
+                {!isEditing && (
                   <div className="px-4 mb-4">
                     <div className="bg-gray-100 border-2 border-black rounded-md p-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Play size={16} className="text-black" />
                           <span className="font-medium">Video Status:</span>
+                          {!hasVideo && <span className="text-gray-600 ml-2">Not generated</span>}
                         </div>
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => previewVideo(post.videoUrl!)}
-                            className="py-1 px-3 bg-blue-300 border-2 border-black rounded-md hover:bg-blue-400 flex items-center gap-1 text-sm"
-                          >
-                            <Eye size={14} />
-                            View Video
-                          </button>
+                          {hasVideo && (
+                            <button
+                              onClick={() => previewVideo(post.videoUrl!)}
+                              className="py-1 px-3 bg-blue-300 border-2 border-black rounded-md hover:bg-blue-400 flex items-center gap-1 text-sm"
+                            >
+                              <Eye size={14} />
+                              View Video
+                            </button>
+                          )}
                           <button
                             onClick={() => handleRegenerateVideo(post.id)}
                             disabled={isRegeneratingVideo || isRegeneratingPost || isEditing || isRegeneratingImage}
@@ -724,7 +759,7 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
                             ) : (
                               <>
                                 <RefreshCw size={14} />
-                                New Video
+                                {hasVideo ? "New Video" : "Generate Video"}
                               </>
                             )}
                           </button>

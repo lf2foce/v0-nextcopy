@@ -30,6 +30,9 @@ export default function CompletionStep({
   const [showScheduleAnimation, setShowScheduleAnimation] = useState(false)
   const { toast } = useToast()
 
+  // Ensure we have a valid posts array
+  const safePosts = Array.isArray(posts) ? posts : []
+
   // If isComplete prop changes, update isScheduled state
   useEffect(() => {
     setIsScheduled(isComplete || campaign.currentStep === 8)
@@ -39,8 +42,9 @@ export default function CompletionStep({
     setShowScheduleAnimation(true)
 
     try {
-      // Filter posts with numeric IDs (from the database)
-      const postIds = posts.filter((post) => typeof post.id === "number").map((post) => post.id as number)
+      // Filter posts with numeric IDs (from the database), regardless of whether they have images
+      const postIds = safePosts.filter((post) => typeof post.id === "number").map((post) => post.id as number)
+      console.log("Scheduling all posts with IDs:", postIds)
 
       if (postIds.length > 0) {
         const result = await schedulePosts(postIds)
@@ -62,7 +66,7 @@ export default function CompletionStep({
         setShowScheduleAnimation(false)
         toast({
           title: "Posts scheduled",
-          description: `${posts.length} posts have been scheduled successfully.`,
+          description: `${safePosts.length} posts have been scheduled successfully.`,
         })
         onScheduleComplete()
       }, 1500)
@@ -80,11 +84,11 @@ export default function CompletionStep({
   const startDate =
     campaign.startDate instanceof Date
       ? campaign.startDate.toLocaleDateString()
-      : new Date(campaign.startDate).toLocaleDateString()
+      : new Date(campaign.startDate || new Date()).toLocaleDateString()
 
   // Get theme name from either old or new schema fields
-  const themeName = theme.title || theme.name || "Theme"
-  const themeStory = theme.story || theme.description || ""
+  const themeName = theme?.title || theme?.name || "Theme"
+  const themeStory = theme?.story || theme?.description || ""
 
   return (
     <div className="space-y-6">
@@ -113,12 +117,13 @@ export default function CompletionStep({
           <div>
             <h4 className="font-bold text-lg">Campaign Details</h4>
             <p>
-              <span className="font-bold">Name:</span> {campaign.name || campaign.title}
+              <span className="font-bold">Name:</span> {campaign?.name || campaign?.title || "Untitled Campaign"}
             </p>
             <p>
-              <span className="font-bold">Target:</span> {campaign.target || campaign.targetCustomer}
+              <span className="font-bold">Target:</span>{" "}
+              {campaign?.target || campaign?.targetCustomer || "Not specified"}
             </p>
-            {campaign.insight && (
+            {campaign?.insight && (
               <p>
                 <span className="font-bold">Insight:</span> {campaign.insight}
               </p>
@@ -127,7 +132,7 @@ export default function CompletionStep({
               <span className="font-bold">Start Date:</span> {startDate}
             </p>
             <p>
-              <span className="font-bold">Repeat Every:</span> {campaign.repeatEveryDays} days
+              <span className="font-bold">Repeat Every:</span> {campaign?.repeatEveryDays || 7} days
             </p>
           </div>
 
@@ -145,16 +150,16 @@ export default function CompletionStep({
 
           <div>
             <h4 className="font-bold text-lg">
-              {isScheduled ? "Scheduled Posts" : "Posts with Generated Images"} ({posts.length})
+              {isScheduled ? "Scheduled Posts" : "Posts with Generated Images"} ({safePosts.length})
             </h4>
             <div className="space-y-4 mt-2">
-              {posts.length > 0 ? (
-                posts.map((post) => (
-                  <div key={post.id} className="border-2 border-black rounded-md p-4 bg-gray-50">
+              {safePosts.length > 0 ? (
+                safePosts.map((post) => (
+                  <div key={post?.id || Math.random()} className="border-2 border-black rounded-md p-4 bg-gray-50">
                     <div className="flex flex-col md:flex-row gap-4">
                       <div className="w-full md:w-1/3 relative h-48 md:h-auto">
                         <Image
-                          src={post.image || post.imageUrl || "/placeholder.svg"}
+                          src={post?.image || post?.imageUrl || "/placeholder.svg?height=400&width=400&text=No_Image"}
                           alt="Post preview"
                           fill
                           className="object-cover rounded-md"
@@ -166,7 +171,7 @@ export default function CompletionStep({
                         )}
                       </div>
                       <div className="flex-1">
-                        <p className="text-lg">{post.content}</p>
+                        <p className="text-lg">{post?.content || "No content"}</p>
                       </div>
                     </div>
                   </div>
@@ -193,7 +198,7 @@ export default function CompletionStep({
 
             <button
               onClick={handleSchedulePosts}
-              disabled={showScheduleAnimation || posts.length === 0}
+              disabled={showScheduleAnimation || safePosts.length === 0}
               className="py-3 px-6 bg-yellow-300 border-4 border-black rounded-md font-bold text-lg hover:bg-yellow-400 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2 disabled:opacity-70"
             >
               {showScheduleAnimation ? (

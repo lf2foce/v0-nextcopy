@@ -31,6 +31,7 @@ interface MultipleImagesDisplayProps {
   showMainImage?: boolean
   videoUrl?: string
   onImageClick?: (index: number) => void
+  showSelectedOnly?: boolean
 }
 
 // Update the function parameters to include the new prop
@@ -43,6 +44,7 @@ export function MultipleImagesDisplay({
   showMainImage = true,
   videoUrl,
   onImageClick,
+  showSelectedOnly = true,
 }: MultipleImagesDisplayProps) {
   const [selectedIndex, setSelectedIndex] = useState(defaultImageIndex)
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({})
@@ -77,8 +79,8 @@ export function MultipleImagesDisplay({
     return img && img.url && !img.url.startsWith("blob:") && isValidImageUrl(img.url)
   })
 
-  // Filter to only show selected images if available
-  const selectedImages = validImages.filter((img) => img.isSelected === true)
+  // Filter to only show selected images if available and showSelectedOnly is true
+  const selectedImages = showSelectedOnly ? validImages.filter((img) => img.isSelected === true) : validImages
 
   // Use selected images if available, otherwise fall back to all valid images
   const imagesToDisplay = selectedImages.length > 0 ? selectedImages : validImages

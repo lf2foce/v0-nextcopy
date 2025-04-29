@@ -133,6 +133,8 @@ export async function updatePostContent(postId: number, content: string) {
   }
 }
 
+// Find the schedulePosts function and modify it to remove any image validation
+
 // Schedule posts
 export async function schedulePosts(postIds: number[]) {
   try {
@@ -194,7 +196,7 @@ export async function fetchPostsForTheme(campaignId: number, themeId: number) {
   }
 }
 
-// Update post images
+// Revert the updatePostImages function to its original implementation
 export async function updatePostImages(postsToUpdate: { id: number; image: string }[]) {
   try {
     console.log("Updating post images:", postsToUpdate)
@@ -266,8 +268,18 @@ export async function getCampaign(campaignId: number) {
     // Process data after fetching
     const selectedTheme = allThemes.find((theme) => theme.isSelected)
     const approvedPosts = allPosts.filter((post) => post.status === "approved")
-    const postsWithImages = allPosts.filter((post) => post.imageUrl)
-    const postsWithVideos = allPosts.filter((post) => post.videoUrl)
+
+    // MODIFIED: Use approvedPosts for both postsWithImages and postsWithVideos
+    // This ensures all approved posts flow through the workflow regardless of media content
+    const postsWithImages = approvedPosts
+    const postsWithVideos = approvedPosts
+
+    // Log the counts for debugging
+    console.log(`Campaign ${campaignId} data loaded:`)
+    console.log(`- All posts: ${allPosts.length}`)
+    console.log(`- Approved posts: ${approvedPosts.length}`)
+    console.log(`- Posts with images (all approved): ${postsWithImages.length}`)
+    console.log(`- Posts with videos (all approved): ${postsWithVideos.length}`)
 
     return {
       success: true,

@@ -129,6 +129,12 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   useEffect(() => {
     if (initialData) {
       console.log("Initial data received:", initialData)
+
+      // Log the counts of posts in each category for debugging
+      console.log(`- All posts: ${initialData.posts?.length || 0}`)
+      console.log(`- Selected posts: ${initialData.selectedPosts?.length || 0}`)
+      console.log(`- Posts with images: ${initialData.postsWithImages?.length || 0}`)
+      console.log(`- Posts with videos: ${initialData.postsWithVideos?.length || 0}`)
     }
   }, [initialData])
 
@@ -178,12 +184,14 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   }
 
   const handleApproveContent = (approvedPosts: Post[]) => {
+    console.log(`Content step completed with ${approvedPosts.length} approved posts`)
     setSelectedPosts(approvedPosts)
     setPosts(approvedPosts) // Also update the main posts array
     nextStep()
   }
 
   const handleGenerateImages = (updatedPosts: Post[]) => {
+    console.log(`Image step completed with ${updatedPosts.length} posts`)
     // Store the posts with their image selection state
     setPostsWithImages(updatedPosts)
     setPosts(updatedPosts) // Update the main posts array
@@ -202,12 +210,20 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
   }
 
   const handleGenerateVideos = (updatedPosts: Post[]) => {
+    console.log(`Video step completed with ${updatedPosts.length} posts`)
+
+    // Store all posts from the Video Step, regardless of whether they have videos
     setPostsWithVideos(updatedPosts)
     setPosts(updatedPosts) // Update the main posts array
+
+    // CRITICAL: Update selectedPosts to ensure all posts are preserved
+    setSelectedPosts(updatedPosts)
+
     nextStep()
   }
 
   const handleReviewComplete = async (finalPosts: Post[]) => {
+    console.log(`Review step completed with ${finalPosts.length} posts`)
     setReviewedPosts(finalPosts)
     setPosts(finalPosts) // Update the main posts array
 
@@ -282,10 +298,20 @@ export default function CampaignWorkflow({ initialCampaign, initialStep = 0, ini
 
   // Determine which posts to use for the current step
   const getPostsForCurrentStep = () => {
+    // If we have reviewed posts, use those
     if (reviewedPosts.length > 0) return reviewedPosts
+
+    // For the Review Step (step 5) and Schedule Step (step 6), ALWAYS use selectedPosts which contains ALL posts
+    if (currentStep === 5 || currentStep === 6) {
+      console.log(`Using selectedPosts for step ${currentStep} with ${selectedPosts.length} posts`)
+      return selectedPosts.length > 0 ? selectedPosts : posts
+    }
+
+    // For other steps, use the most recently updated collection
     if (postsWithVideos.length > 0) return postsWithVideos
     if (postsWithImages.length > 0) return postsWithImages
     if (selectedPosts.length > 0) return selectedPosts
+
     return posts
   }
 

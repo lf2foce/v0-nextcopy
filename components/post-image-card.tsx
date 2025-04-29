@@ -79,6 +79,9 @@ export default function PostImageCard({
   // Track image loading errors
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({})
 
+  // Track if content is expanded
+  const [isContentExpanded, setIsContentExpanded] = useState(false)
+
   // Track viewport size
   const [isMobile, setIsMobile] = useState(false)
 
@@ -273,7 +276,26 @@ export default function PostImageCard({
       </div>
 
       <div className="p-4">
-        <p className="text-lg mb-4 line-clamp-2">{post.content}</p>
+        {post.content && (
+          <div className="mb-4">
+            {post.content.length > 150 ? (
+              <div>
+                <p className="text-lg">{isContentExpanded ? post.content : `${post.content.substring(0, 150)}...`}</p>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setIsContentExpanded(!isContentExpanded)
+                  }}
+                  className="text-sm text-gray-500 hover:text-gray-700 mt-1"
+                >
+                  {isContentExpanded ? "Show less" : "See more"}
+                </button>
+              </div>
+            ) : (
+              <p className="text-lg">{post.content}</p>
+            )}
+          </div>
+        )}
 
         {isProcessing ? (
           <div className="h-64 flex flex-col items-center justify-center bg-gray-50 border-2 border-gray-300 border-dashed rounded-lg">

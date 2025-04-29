@@ -30,7 +30,7 @@ export default function CampaignContentClient({
 }) {
   const router = useRouter()
   const [campaign, setCampaign] = useState<any>(initialCampaign)
-  const [activeFilter, setActiveFilter] = useState("posted") // Default to posted content
+  const [activeFilter, setActiveFilter] = useState("all") // Default to all content except disapproved
   const [modalPost, setModalPost] = useState<any>(null)
   const [postingId, setPostingId] = useState<number | null>(null)
   const { toast } = useToast()
@@ -116,18 +116,19 @@ export default function CampaignContentClient({
       if (post.images) {
         const imagesData = JSON.parse(post.images)
         if (imagesData.images && imagesData.images.length > 0) {
-          // Filter to only show selected images if available
+          // Only show selected images
           const selectedImages = imagesData.images.filter((img: any) => img.isSelected === true)
-          const imagesToShow = selectedImages.length > 0 ? selectedImages : imagesData.images
 
-          setViewerImages(imagesToShow)
-          setViewerInitialIndex(0)
-          setViewerOpen(true)
-          return
+          if (selectedImages.length > 0) {
+            setViewerImages(selectedImages)
+            setViewerInitialIndex(0)
+            setViewerOpen(true)
+            return
+          }
         }
       }
 
-      // Fallback to single image if JSON parsing fails or no images
+      // Fallback to single image if JSON parsing fails or no selected images
       if (post.imageUrl) {
         setViewerImages([{ url: post.imageUrl }])
         setViewerInitialIndex(0)
@@ -155,13 +156,13 @@ export default function CampaignContentClient({
   // Filter posts based on active filter
   const filteredPosts =
     activeFilter === "all"
-      ? allPosts
+      ? allPosts.filter((post: any) => post.status !== "disapproved")
       : allPosts.filter((post: any) => {
           if (activeFilter === "approved") {
             return post.status === "approved"
           } else if (activeFilter === "scheduled") {
             return post.status === "scheduled"
-          } else if (activeFilter === "posted" || activeFilter === "published") {
+          } else if (activeFilter === "published") {
             return post.status === "posted"
           } else if (activeFilter === "disapproved") {
             return post.status === "disapproved"
@@ -171,7 +172,7 @@ export default function CampaignContentClient({
 
   // Count posts by status
   const postCounts = {
-    all: allPosts.length,
+    all: allPosts.filter((post: any) => post.status !== "disapproved").length,
     approved: allPosts.filter((post: any) => post.status === "approved").length,
     scheduled: allPosts.filter((post: any) => post.status === "scheduled").length,
     published: allPosts.filter((post: any) => post.status === "posted").length,
@@ -267,7 +268,7 @@ export default function CampaignContentClient({
           <p className="text-gray-700">
             {activeFilter === "all"
               ? "No content has been generated for this campaign yet."
-              : `No ${activeFilter === "posted" ? "published" : activeFilter} content found for this campaign.`}
+              : `No ${activeFilter === "published" ? "published" : activeFilter} content found for this campaign.`}
           </p>
         </div>
       ) : (
@@ -294,9 +295,7 @@ export default function CampaignContentClient({
                 className="bg-white border-4 border-black rounded-lg overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
               >
                 <div className="flex justify-between items-start p-4 border-b-4 border-black">
-                  <h3 className="text-xl font-bold">
-                    {post.status === "posted" ? "Content Published" : `Post ${index + 1}`}
-                  </h3>
+                  <h3 className="text-xl font-bold">{post.title || `Post ${index + 1}`}</h3>
                   <span
                     className={`py-1 px-3 border-2 border-black rounded-md text-sm font-medium ${statusColor} ${statusColor === "bg-[#22c55e]" || statusColor === "bg-[#60a5fa]" ? "text-white" : ""}`}
                   >
@@ -315,6 +314,7 @@ export default function CampaignContentClient({
                       layout="horizontal"
                       showMainImage={false}
                       videoUrl={post.videoUrl}
+                      showSelectedOnly={true}
                     />
                   </div>
 
