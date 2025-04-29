@@ -33,6 +33,7 @@ export const themes = pgTable("themes", {
   isSelected: boolean("is_selected").default(false),
   status: themeStatusEnum("status").default("pending"),
   post_status: text("post_status"), // Added post_status field
+  content_plan: text("content_plan"), // Thêm trường content_plan để lưu trữ kế hoạch bài viết
   createdAt: timestamp("created_at").defaultNow().notNull(),
 })
 

@@ -39,6 +39,12 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json()
+    console.log("API response data structure:", Object.keys(data))
+    console.log("First theme content_plan check:", data[0]?.content_plan ? "Has content_plan" : "No content_plan")
+    if (data[0]?.content_plan) {
+      console.log("Content plan structure:", Object.keys(data[0].content_plan))
+      console.log("Content plan items count:", data[0].content_plan.items?.length || 0)
+    }
     return NextResponse.json({ success: true, data })
   } catch (error) {
     console.error("Error in theme generation API:", error)

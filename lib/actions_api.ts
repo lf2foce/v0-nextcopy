@@ -84,9 +84,7 @@ export async function generateThemes(campaignId: number) {
   console.log("Server action: generateThemes called with campaignId:", campaignId)
 
   try {
-    // Use the external API via our proxy endpoint
-    console.log("Fetching themes from external API")
-
+    // Kiểm tra FASTAPI_URL
     if (!process.env.FASTAPI_URL) {
       return {
         success: false,
@@ -95,6 +93,7 @@ export async function generateThemes(campaignId: number) {
     }
 
     try {
+      // Gọi API endpoint
       const siteUrl = getSiteUrl()
       const response = await fetch(`${siteUrl}/api/copy/themes/generate`, {
         method: "POST",
@@ -104,22 +103,21 @@ export async function generateThemes(campaignId: number) {
         body: JSON.stringify({ campaignId }),
       })
 
+      // Xử lý lỗi HTTP
       if (!response.ok) {
-        // Try to get error details - first as JSON, then as text
         let errorMessage = `External API error: ${response.status} ${response.statusText}`
 
         try {
           const errorData = await response.json()
           errorMessage = errorData.error || errorMessage
         } catch (jsonError) {
-          // If JSON parsing fails, try to get the response as text
           try {
             const errorText = await response.text()
             if (errorText) {
               errorMessage = `${errorMessage} - ${errorText.substring(0, 100)}`
             }
           } catch (textError) {
-            // If even text extraction fails, use the default error message
+            // Sử dụng thông báo lỗi mặc định
           }
         }
 
@@ -127,7 +125,7 @@ export async function generateThemes(campaignId: number) {
         throw new Error(errorMessage)
       }
 
-      // Try to parse the response as JSON with better error handling
+      // Parse kết quả API
       try {
         const apiResult = await response.json()
 
@@ -135,35 +133,18 @@ export async function generateThemes(campaignId: number) {
           throw new Error(apiResult.error || "API returned unsuccessful response")
         }
 
-        // Process the themes from the API
-        const apiThemes = apiResult.data
+        // Trả về kết quả trực tiếp từ API mà không thực hiện thao tác database
+        console.log("Themes fetched successfully from API")
 
-        // First, delete all existing themes for this campaign
-        await db.delete(themes).where(eq(themes.campaignId, campaignId))
-
-        // Map API themes to our database schema
-        const themesToInsert = apiThemes.map((theme: any) => ({
-          campaignId,
-          title: theme.name || theme.title,
-          story: theme.description || theme.story,
-          isSelected: false,
-          status: "pending",
-          post_status: theme.post_status || "pending", // Add post_status field
-        }))
-
-        console.log("Inserting themes from API:", themesToInsert)
-        const insertedThemes = await db.insert(themes).values(themesToInsert).returning()
-        console.log("Inserted themes:", insertedThemes)
-
-        // Update campaign step to Generate Theme (2)
-        const steps = await getCampaignSteps()
-        await updateCampaignStep(campaignId, steps.GENERATE_THEME)
-
-        return { success: true, data: insertedThemes }
+        // Trả về dữ liệu từ API
+        return {
+          success: true,
+          data: apiResult.data,
+          message: "Themes fetched successfully",
+        }
       } catch (parseError) {
         console.error("Error parsing API response:", parseError)
 
-        // Try to get the response body as text for better error reporting
         try {
           const responseText = await response.text()
           console.error("Response body:", responseText.substring(0, 200))

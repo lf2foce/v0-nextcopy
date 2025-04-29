@@ -87,6 +87,26 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
     setSelectedThemeId(themeId)
   }
 
+  // Function to safely parse content plan
+  const parseContentPlan = (contentPlanData: any) => {
+    if (!contentPlanData) return null
+
+    // If it's already an object, return it
+    if (typeof contentPlanData === "object") return contentPlanData
+
+    // If it's a string, try to parse it
+    if (typeof contentPlanData === "string") {
+      try {
+        return JSON.parse(contentPlanData)
+      } catch (e) {
+        console.error("Error parsing content plan:", e)
+        return null
+      }
+    }
+
+    return null
+  }
+
   // Function to save custom theme to database
   const saveCustomThemeToDatabase = async (customTheme: Theme): Promise<Theme | null> => {
     if (!campaign.id) {
@@ -109,10 +129,10 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
         isSelected: true, // Mark as selected by default
         status: "selected",
         post_status: "pending", // Start with pending status
+        content_plan: customTheme.content_plan || null, // Include content plan
       }
 
       // Use server action to save the theme
-      // We'll create a new function in lib/actions_api.ts to handle this
       const response = await fetch("/api/themes/create-custom", {
         method: "POST",
         headers: {
@@ -157,6 +177,24 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
       return
     }
 
+    // Create a basic content plan structure for the custom theme
+    const basicContentPlan = {
+      items: [
+        {
+          goal: "Giới thiệu thương hiệu và sản phẩm chính",
+          title: "Giới thiệu về " + customThemeTitle,
+          format: "Bài viết blog/social media",
+          content_idea: "Giới thiệu tổng quan về thương hiệu, giá trị cốt lõi và sản phẩm chính",
+        },
+        {
+          goal: "Xây dựng niềm tin với khách hàng",
+          title: "Câu chuyện đằng sau " + customThemeTitle,
+          format: "Video ngắn/bài viết",
+          content_idea: "Chia sẻ câu chuyện, nguồn cảm hứng và quá trình phát triển thương hiệu",
+        },
+      ],
+    }
+
     const newCustomTheme: Theme = {
       id: `custom-${Date.now()}`,
       title: customThemeTitle,
@@ -164,6 +202,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
       campaignId: campaign.id,
       isSelected: false,
       status: "pending",
+      content_plan: JSON.stringify(basicContentPlan),
     }
 
     setCustomTheme(newCustomTheme)
@@ -347,8 +386,40 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
                     <h3 className="font-bold text-lg">{theme.title || theme.name}</h3>
                     <p className="text-gray-700 mb-2">{theme.story || theme.description}</p>
 
+                    {/* Simplified Content Plan Section */}
+                    {theme.content_plan && (
+                      <div className="mt-4 border-t-2 border-black pt-3">
+                        <h4 className="font-bold text-md mb-2">Kế hoạch bài viết:</h4>
+                        <div className="space-y-2">
+                          {(() => {
+                            try {
+                              const contentPlan = parseContentPlan(theme.content_plan)
+
+                              if (contentPlan && contentPlan.items && Array.isArray(contentPlan.items)) {
+                                return contentPlan.items.map((item, index) => (
+                                  <div key={index} className="border border-gray-200 p-2 rounded-md bg-white">
+                                    <p className="font-medium text-sm">{item.title}</p>
+                                  </div>
+                                ))
+                              }
+                              return <p className="text-sm italic">Không có kế hoạch bài viết chi tiết</p>
+                            } catch (e) {
+                              console.error("Error rendering content plan:", e, theme.content_plan)
+                              return (
+                                <div className="p-2 bg-red-50 border border-red-200 rounded-md">
+                                  <p className="text-sm italic text-red-500">
+                                    Không thể hiển thị kế hoạch bài viết do lỗi định dạng
+                                  </p>
+                                </div>
+                              )
+                            }
+                          })()}
+                        </div>
+                      </div>
+                    )}
+
                     {theme.tags && (
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2 mt-3">
                         {theme.tags.map((tag, index) => (
                           <span
                             key={index}
@@ -436,7 +507,34 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
                     <>
                       <h3 className="font-bold text-lg">{customTheme.title}</h3>
                       <p className="text-gray-700 mb-2">{customTheme.story}</p>
-                      <div className="flex gap-2">
+
+                      {/* Simplified Custom Theme Content Plan */}
+                      {customTheme.content_plan && (
+                        <div className="mt-4 border-t-2 border-black pt-3">
+                          <h4 className="font-bold text-md mb-2">Kế hoạch bài viết:</h4>
+                          <div className="space-y-2">
+                            {(() => {
+                              try {
+                                const contentPlan = parseContentPlan(customTheme.content_plan)
+
+                                if (contentPlan && contentPlan.items && Array.isArray(contentPlan.items)) {
+                                  return contentPlan.items.map((item, index) => (
+                                    <div key={index} className="border border-gray-200 p-2 rounded-md bg-white">
+                                      <p className="font-medium text-sm">{item.title}</p>
+                                    </div>
+                                  ))
+                                }
+                                return <p className="text-sm italic">Không có kế hoạch bài viết chi tiết</p>
+                              } catch (e) {
+                                console.error("Error rendering custom content plan:", e)
+                                return <p className="text-sm italic text-red-500">Lỗi hiển thị kế hoạch bài viết</p>
+                              }
+                            })()}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 mt-3">
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
