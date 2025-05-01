@@ -3,10 +3,12 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Flag, PlusCircle, Menu, X, Database } from "lucide-react"
+import { LayoutDashboard, Flag, PlusCircle, Menu, X, Database, LogIn } from "lucide-react"
+import { SignInButton, UserButton, useUser } from "@clerk/nextjs"
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const { isLoaded, isSignedIn } = useUser()
   const [isOpen, setIsOpen] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
 
@@ -57,14 +59,34 @@ export default function Sidebar() {
         } fixed lg:sticky top-0 left-0 z-40 h-screen bg-white border-r-4 border-black transition-transform duration-300 ease-in-out w-64 lg:translate-x-0 shadow-lg`}
       >
         <div className="border-b border-black/10">
-          <div className="p-4 pt-12 md:pt-4">
-            <h1 className="text-xl font-black">Campaign Manager</h1>
-            <div className="h-4 w-4 bg-yellow-300 rounded-full mt-1 border-2 border-black"></div>
+          <div className="p-4 pt-12 md:pt-4 flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-black">Campaign Manager</h1>
+              <div className="h-4 w-4 bg-yellow-300 rounded-full mt-1 border-2 border-black"></div>
+            </div>
+            {isSignedIn && isLoaded && (
+              <UserButton
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: "h-8 w-8"
+                  }
+                }}
+              />
+            )}
           </div>
         </div>
 
         <div className="p-4">
           <nav className="space-y-1">
+            {!isSignedIn && isLoaded && (
+              <SignInButton mode="modal">
+                <button className="flex items-center w-full py-3 px-4 rounded-md font-medium transition-colors hover:bg-gray-100 border-2 border-transparent">
+                  <LogIn className="mr-2" size={20} />
+                  <span>Sign In</span>
+                </button>
+              </SignInButton>
+            )}
             <Link
               href="/guide"
               className={`flex items-center w-full py-3 px-4 rounded-md font-medium transition-colors ${
@@ -93,18 +115,20 @@ export default function Sidebar() {
 
             {/* Templates and Content links removed */}
 
-            <Link
-              href="/admin"
-              className={`flex items-center w-full py-3 px-4 rounded-md font-medium transition-colors ${
-                isActive("/admin")
-                  ? "bg-yellow-300 border-2 border-black"
-                  : "hover:bg-gray-100 border-2 border-transparent"
-              }`}
-              onClick={() => isMobile && setIsOpen(false)}
-            >
-              <Database className="mr-2" size={20} />
-              <span>Admin</span>
-            </Link>
+            {isSignedIn && (
+              <Link
+                href="/admin"
+                className={`flex items-center w-full py-3 px-4 rounded-md font-medium transition-colors ${
+                  isActive("/admin")
+                    ? "bg-yellow-300 border-2 border-black"
+                    : "hover:bg-gray-100 border-2 border-transparent"
+                }`}
+                onClick={() => isMobile && setIsOpen(false)}
+              >
+                <Database className="mr-2" size={20} />
+                <span>Admin</span>
+              </Link>
+            )}
           </nav>
 
           <div className="mt-6">

@@ -1,13 +1,27 @@
-import { pgTable, serial, text, timestamp, integer, boolean, pgEnum, date } from "drizzle-orm/pg-core"
+import { pgTable, serial, text, timestamp, integer, boolean, pgEnum, date, jsonb } from "drizzle-orm/pg-core"
 import { relations } from "drizzle-orm"
 
 // Define enums
 export const themeStatusEnum = pgEnum("theme_status", ["pending", "selected", "discarded"])
 export const campaignStatusEnum = pgEnum("campaign_status", ["draft", "active", "archived"])
+// Users table
+export const users = pgTable("users", {
+  id: text("id").primaryKey(), // Clerk user ID
+  name: text("name"),
+  email: text("email").unique().notNull(),
+  email_verified: boolean("email_verified").default(false),
+  image_url: text("image_url"),
+  role: text("role").default("user"),
+  preferences: jsonb("preferences").default({}),
+  last_login_at: timestamp("last_login_at"),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+})
 
 // Campaigns table
 export const campaigns = pgTable("campaigns", {
   id: serial("id").primaryKey(),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
   title: text("title").notNull(),
   repeatEveryDays: integer("repeat_every_days").notNull(),
   targetCustomer: text("target_customer"),
@@ -62,7 +76,15 @@ export const contentPosts = pgTable("content_posts", {
 })
 
 // Define relations
-export const campaignsRelations = relations(campaigns, ({ many }) => ({
+export const usersRelations = relations(users, ({ many }) => ({
+  campaigns: many(campaigns),
+}))
+
+export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
+  user: one(users, {
+    fields: [campaigns.userId],
+    references: [users.id],
+  }),
   themes: many(themes),
   contentPosts: many(contentPosts),
 }))
@@ -87,6 +109,9 @@ export const contentPostsRelations = relations(contentPosts, ({ one }) => ({
 }))
 
 // Types for inference
+export type User = typeof users.$inferSelect
+export type NewUser = typeof users.$inferInsert
+
 export type Campaign = typeof campaigns.$inferSelect
 export type NewCampaign = typeof campaigns.$inferInsert
 

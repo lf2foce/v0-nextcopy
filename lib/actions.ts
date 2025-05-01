@@ -22,6 +22,8 @@ const CAMPAIGN_STEPS = {
 // Find the createCampaign function and modify it to trigger system prompt generation
 // after creating the campaign but without awaiting its completion
 
+import { getOrCreateUser } from "./user-actions"
+
 export async function createCampaign(campaignData: any) {
   console.log("Creating campaign with data:", campaignData)
 
@@ -34,10 +36,20 @@ export async function createCampaign(campaignData: any) {
       }
     }
 
-    // Create campaign in database
+    // Lấy hoặc tạo user từ Clerk
+    const userResult = await getOrCreateUser()
+    if (!userResult.success || !userResult.data) {
+      return {
+        success: false,
+        error: "Failed to get or create user",
+      }
+    }
+
+    // Create campaign in database with user ID
     const campaign = await db
       .insert(campaigns)
       .values({
+        userId: userResult.data.id,
         title: campaignData.name,
         description: campaignData.description,
         targetCustomer: campaignData.target,

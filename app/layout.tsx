@@ -7,12 +7,7 @@ import { SidebarProvider } from "@/components/ui/sidebar"
 import Sidebar from "@/components/sidebar"
 
 import {
-  ClerkProvider,
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
+  ClerkProvider
 } from '@clerk/nextjs'
 
 const inter = Inter({ subsets: ["latin"] })
@@ -33,16 +28,6 @@ export default function RootLayout({
     <html lang="en">
       
       <body className={inter.className}>
-
-      <header className="flex justify-end items-center p-4 gap-4 h-16">
-            <SignedOut>
-              <SignInButton mode='modal' />
-              <SignUpButton />
-            </SignedOut>
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
-          </header>
 
         <ToastProvider>
           <SidebarProvider>
