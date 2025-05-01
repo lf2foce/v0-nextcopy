@@ -3,14 +3,16 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Flag, PlusCircle, Menu, X, Database, LogIn } from "lucide-react"
+import { LayoutDashboard, Flag, PlusCircle, Menu, X, Database, LogIn, Globe } from "lucide-react"
 import { SignInButton, UserButton, useUser } from "@clerk/nextjs"
+import { useLanguage } from "@/contexts/language-context"
 
 export default function Sidebar() {
   const pathname = usePathname()
   const { isLoaded, isSignedIn } = useUser()
   const [isOpen, setIsOpen] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
+  const { language, setLanguage, translations } = useLanguage()
 
   // Check if we're on mobile and close sidebar by default
   useEffect(() => {
@@ -79,11 +81,19 @@ export default function Sidebar() {
 
         <div className="p-4">
           <nav className="space-y-1">
+            <button
+              onClick={() => setLanguage(language === 'en' ? 'vi' : 'en')}
+              className="flex items-center w-full py-3 px-4 rounded-md font-medium transition-colors hover:bg-gray-100 border-2 border-transparent"
+            >
+              <Globe className="mr-2" size={20} />
+              <span>{translations.languageSwitch}</span>
+            </button>
+
             {!isSignedIn && isLoaded && (
               <SignInButton mode="modal">
                 <button className="flex items-center w-full py-3 px-4 rounded-md font-medium transition-colors hover:bg-gray-100 border-2 border-transparent">
                   <LogIn className="mr-2" size={20} />
-                  <span>Sign In</span>
+                  <span>{translations.signIn}</span>
                 </button>
               </SignInButton>
             )}
@@ -97,7 +107,7 @@ export default function Sidebar() {
               onClick={() => isMobile && setIsOpen(false)}
             >
               <LayoutDashboard className="mr-2" size={20} />
-              <span>Guide</span>
+              <span>{translations.guide}</span>
             </Link>
 
             <Link
@@ -110,7 +120,7 @@ export default function Sidebar() {
               onClick={() => isMobile && setIsOpen(false)}
             >
               <Flag className="mr-2" size={20} />
-              <span>Campaigns</span>
+              <span>{translations.campaigns}</span>
             </Link>
 
             {/* Templates and Content links removed */}
@@ -126,7 +136,7 @@ export default function Sidebar() {
                 onClick={() => isMobile && setIsOpen(false)}
               >
                 <Database className="mr-2" size={20} />
-                <span>Admin</span>
+                <span>{translations.admin}</span>
               </Link>
             )}
           </nav>
@@ -138,7 +148,7 @@ export default function Sidebar() {
               onClick={() => isMobile && setIsOpen(false)}
             >
               <PlusCircle size={18} />
-              Create New Campaign
+              {translations.createNewCampaign}
             </Link>
           </div>
         </div>

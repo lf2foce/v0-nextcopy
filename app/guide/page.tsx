@@ -1,14 +1,16 @@
+"use client"
 import Link from "next/link"
 import { Lightbulb, BookOpen, Target, Calendar, PenTool, BarChart } from "lucide-react"
 
-// Add revalidate at the module level
-export const revalidate = 3600 // Revalidate every hour since guide content changes less frequently
+import { useLanguage } from "@/contexts/language-context"
 
 export default function GuidePage() {
+  const { translations } = useLanguage()
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-black">Campaign Creation Guide</h1>
+        <h1 className="text-4xl font-black">{translations.guideTitle}</h1>
       </div>
 
       <div className="bg-white border-4 border-black rounded-lg p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] mb-8">
@@ -17,20 +19,14 @@ export default function GuidePage() {
             <BookOpen size={24} />
           </div>
           <div>
-            <h2 className="text-2xl font-bold mb-2">Getting Started</h2>
-            <p className="text-gray-700 mb-4">
-              Welcome to the Campaign Manager! This guide will help you create effective marketing campaigns that engage
-              your audience and drive results.
-            </p>
-            <p className="text-gray-700 mb-4">
-              Follow the steps below to create your first campaign. Each step is designed to help you craft compelling
-              content that resonates with your target audience.
-            </p>
+            <h2 className="text-2xl font-bold mb-2">{translations.gettingStartedTitle}</h2>
+            <p className="text-gray-700 mb-4">{translations.gettingStartedDesc1}</p>
+            <p className="text-gray-700 mb-4">{translations.gettingStartedDesc2}</p>
             <Link
               href="/create-campaign"
               className="inline-flex items-center py-2 px-4 bg-green-400 border-2 border-black rounded-md font-medium hover:bg-green-500"
             >
-              Start Creating
+              {translations.startCreating}
             </Link>
           </div>
         </div>
@@ -43,11 +39,8 @@ export default function GuidePage() {
               <Target size={20} />
             </div>
             <div>
-              <h3 className="text-xl font-bold mb-2">Step 1: Define Your Campaign</h3>
-              <p className="text-gray-700">
-                Start by defining your campaign's name, description, target audience, and platform. Be specific about
-                who you're trying to reach and what you want to achieve.
-              </p>
+              <h3 className="text-xl font-bold mb-2">{translations.step1Title}</h3>
+              <p className="text-gray-700">{translations.step1Desc}</p>
             </div>
           </div>
         </div>
@@ -58,11 +51,8 @@ export default function GuidePage() {
               <Lightbulb size={20} />
             </div>
             <div>
-              <h3 className="text-xl font-bold mb-2">Step 2: Generate & Select Themes</h3>
-              <p className="text-gray-700">
-                Our AI will generate theme options based on your campaign details. Choose the one that best fits your
-                brand identity and campaign goals.
-              </p>
+              <h3 className="text-xl font-bold mb-2">{translations.step2Title}</h3>
+              <p className="text-gray-700">{translations.step2Desc}</p>
             </div>
           </div>
         </div>
@@ -73,11 +63,8 @@ export default function GuidePage() {
               <PenTool size={20} />
             </div>
             <div>
-              <h3 className="text-xl font-bold mb-2">Step 3: Create & Approve Content</h3>
-              <p className="text-gray-700">
-                Generate post content based on your campaign and selected theme. Review and approve the posts that best
-                communicate your message.
-              </p>
+              <h3 className="text-xl font-bold mb-2">{translations.step3Title}</h3>
+              <p className="text-gray-700">{translations.step3Desc}</p>
             </div>
           </div>
         </div>
@@ -88,11 +75,8 @@ export default function GuidePage() {
               <Calendar size={20} />
             </div>
             <div>
-              <h3 className="text-xl font-bold mb-2">Step 4: Generate Images & Schedule</h3>
-              <p className="text-gray-700">
-                Generate images for your approved posts and schedule them for publication. Our system will automatically
-                post them at the optimal times for engagement.
-              </p>
+              <h3 className="text-xl font-bold mb-2">{translations.step4Title}</h3>
+              <p className="text-gray-700">{translations.step4Desc}</p>
             </div>
           </div>
         </div>
@@ -103,10 +87,9 @@ export default function GuidePage() {
               <BarChart size={20} />
             </div>
             <div>
-              <h3 className="text-xl font-bold mb-2">Step 5: Monitor Performance</h3>
+              <h3 className="text-xl font-bold mb-2">{translations.step5Title}</h3>
               <p className="text-gray-700">
-                Track your campaign's performance and make adjustments as needed. Analyze engagement metrics to
-                understand what's working and what can be improved.
+              {translations.step5Desc}
               </p>
             </div>
           </div>

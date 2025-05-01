@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/toast-provider"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import Sidebar from "@/components/sidebar"
 import { Analytics } from "@vercel/analytics/react"
+import { LanguageProvider } from "@/contexts/language-context"
 
 import {
   ClerkProvider
@@ -27,19 +28,19 @@ export default function RootLayout({
   return (
     <ClerkProvider>
     <html lang="en">
-      
       <body className={inter.className}>
-
         <ToastProvider>
-          <SidebarProvider>
-            <div className="flex min-h-screen">
-              <Sidebar />
-              <main className="flex-1 p-4 md:p-6 lg:p-10 bg-yellow-50 w-full overflow-x-hidden">
-                {children}
-                <Analytics />
+          <LanguageProvider>
+            <SidebarProvider>
+              <div className="flex min-h-screen">
+                <Sidebar />
+                <main className="flex-1 p-4 md:p-6 lg:p-10 bg-yellow-50 w-full overflow-x-hidden">
+                  {children}
+                  <Analytics />
                 </main>
-            </div>
-          </SidebarProvider>
+              </div>
+            </SidebarProvider>
+          </LanguageProvider>
         </ToastProvider>
       </body>
     </html>
