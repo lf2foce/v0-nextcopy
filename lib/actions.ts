@@ -268,7 +268,7 @@ export async function getCampaign(campaignId: number) {
     // Process data after fetching
     const selectedTheme = allThemes.find((theme) => theme.isSelected)
     const approvedPosts = allPosts.filter((post) => post.status === "approved")
-
+    
     // MODIFIED: Use approvedPosts for both postsWithImages and postsWithVideos
     // This ensures all approved posts flow through the workflow regardless of media content
     const postsWithImages = approvedPosts

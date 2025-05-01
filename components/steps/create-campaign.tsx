@@ -171,9 +171,11 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
+    const selectedDate = new Date(value)
+    selectedDate.setHours(0, 0, 0, 0) // Reset time part to midnight
     setFormData((prev) => ({
       ...prev,
-      [name]: new Date(value),
+      [name]: selectedDate,
     }))
   }
 
@@ -338,10 +340,16 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
   }
 
   // Get today's date in YYYY-MM-DD format for the min attribute
-  const today = new Date().toISOString().split("T")[0]
+  const today = new Date()
+  today.setHours(0, 0, 0, 0) // Reset time part to midnight
+  const todayFormatted = today.toISOString().split("T")[0]
 
-  // Format the startDate for the value attribute - ensure it's never undefined
-  const formattedStartDate = formData.startDate instanceof Date ? formData.startDate.toISOString().split("T")[0] : today
+  // Format the startDate for the value attribute
+  const formattedStartDate = formData.startDate instanceof Date 
+    ? new Date(formData.startDate.getTime() - formData.startDate.getTimezoneOffset() * 60000)
+        .toISOString()
+        .split("T")[0]
+    : todayFormatted
 
   return (
     <div className="space-y-6">

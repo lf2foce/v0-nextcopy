@@ -6,6 +6,15 @@ import { ToastProvider } from "@/components/toast-provider"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import Sidebar from "@/components/sidebar"
 
+import {
+  ClerkProvider,
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+} from '@clerk/nextjs'
+
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
@@ -20,8 +29,21 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
+    <ClerkProvider>
     <html lang="en">
+      
       <body className={inter.className}>
+
+      <header className="flex justify-end items-center p-4 gap-4 h-16">
+            <SignedOut>
+              <SignInButton mode='modal' />
+              <SignUpButton />
+            </SignedOut>
+            <SignedIn>
+              <UserButton />
+            </SignedIn>
+          </header>
+
         <ToastProvider>
           <SidebarProvider>
             <div className="flex min-h-screen">
@@ -32,5 +54,6 @@ export default function RootLayout({
         </ToastProvider>
       </body>
     </html>
+    </ClerkProvider>
   )
 }

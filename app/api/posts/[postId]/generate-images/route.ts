@@ -2,7 +2,8 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest, { params }: { params: { postId: string } }) {
   try {
-    const postId = params.postId
+    // Use the Next.js 15 params pattern
+    const { postId } = await params
 
     if (!postId) {
       return NextResponse.json({ success: false, error: "Post ID is required" }, { status: 400 })

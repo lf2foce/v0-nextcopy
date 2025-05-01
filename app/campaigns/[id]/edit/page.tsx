@@ -1,7 +1,8 @@
 import { getCampaignWithStep, getCampaign } from "@/lib/actions"
 import { notFound } from "next/navigation"
 import CampaignEditClient from "./campaign-edit-client"
-import { unstable_noStore } from "next/cache"
+// import { unstable_noStore } from "next/cache"
+import { connection } from 'next/server'
 
 export default async function EditCampaignPage({
   params,
@@ -9,11 +10,11 @@ export default async function EditCampaignPage({
   params: { id: string }
 }) {
   // Disable caching for this page
-  unstable_noStore()
+  await connection()
 
   try {
     // Use the Next.js 15 await params pattern
-    const id = await params.id
+    const {id} = await params
     const campaignId = Number.parseInt(id, 10)
 
     if (isNaN(campaignId)) {
