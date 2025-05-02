@@ -7,6 +7,7 @@ import { SidebarProvider } from "@/components/ui/sidebar"
 import Sidebar from "@/components/sidebar"
 import { Analytics } from "@vercel/analytics/react"
 import { LanguageProvider } from "@/contexts/language-context"
+import { CreditsDisplay } from "@/components/CreditsDisplay"
 
 import {
   ClerkProvider
@@ -38,6 +39,7 @@ export default function RootLayout({
                   {children}
                   <Analytics />
                 </main>
+                <CreditsDisplay />
               </div>
             </SidebarProvider>
           </LanguageProvider>
