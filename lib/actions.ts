@@ -407,34 +407,31 @@ export async function updateCampaignStep(campaignId: number, step: number) {
 // Get all campaigns with status - moved from actions_api.ts
 export async function getAllCampaigns() {
   try {
-    // Use standard select instead of query builder
-    const allCampaigns = await db.select().from(campaigns).orderBy(desc(campaigns.id))
+    //get user_id here
+    const userResult = await getOrCreateUser();
+    if (!userResult.success || !userResult.data) {
+      return { success: false, error: "Unauthorized: Missing user ID." };
+    }
+    const userId = userResult.data.id;
 
-    // Determine UI status based on database status and currentStep
+    const allCampaigns = await db.select().from(campaigns).where(eq(campaigns.userId, userId)).orderBy(desc(campaigns.id));
     const mappedCampaigns = allCampaigns.map(async (campaign) => {
-      // Map status for UI:
-      // - "scheduled" for campaigns at step 8 (fully scheduled)
-      // - "draft" for all other campaigns (in progress/incomplete)
-      const steps = await getCampaignSteps()
-      const uiStatus = campaign.currentStep === steps.SCHEDULED ? "scheduled" : "draft"
-
+      const steps = await getCampaignSteps();
+      const uiStatus = campaign.currentStep === steps.SCHEDULED ? "scheduled" : "draft";
       return {
         ...campaign,
         status: uiStatus,
-        // Make sure isActive is included (default to true if not set)
         isActive: campaign.isActive !== undefined ? campaign.isActive : true,
-      }
-    })
-
-    const resolvedCampaigns = await Promise.all(mappedCampaigns)
-
-    return { success: true, data: resolvedCampaigns }
+      };
+    });
+    const resolvedCampaigns = await Promise.all(mappedCampaigns);
+    return { success: true, data: resolvedCampaigns };
   } catch (error) {
-    console.error("Failed to get campaigns:", error)
+    console.error("Failed to get campaigns:", error);
     return {
       success: false,
       error: "Failed to get campaigns: " + (error instanceof Error ? error.message : String(error)),
-    }
+    };
   }
 }
 
