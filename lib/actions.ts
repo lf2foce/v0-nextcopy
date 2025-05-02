@@ -435,23 +435,6 @@ export async function getAllCampaigns() {
   }
 }
 
-// These are placeholder implementations for functions that are actually implemented in actions_api.ts
-export async function generateThemes(campaignId: number) {
-  return {
-    success: false,
-    error: "generateThemes is not implemented in actions.ts, use the version from actions_api.ts",
-  }
-}
-
-export async function selectTheme(themeId: number) {
-  return {
-    success: false,
-    error: "selectTheme is not implemented in actions.ts, use the version from actions_api.ts",
-  }
-}
-
-// Add this new server action at the end of the file
-
 // Generate system prompt for a campaign
 export async function generateSystemPrompt(campaignData: any) {
   try {

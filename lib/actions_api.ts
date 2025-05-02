@@ -6,6 +6,10 @@ import { eq } from "drizzle-orm"
 import { getCampaignSteps } from "./campaign-steps" // Import from campaign-steps.ts
 import { updatePostImages, updateCampaignStep } from "./actions" // Import from actions.ts
 import { desc } from "drizzle-orm" // Add this import for getAllCampaigns
+import { auth } from "@clerk/nextjs/server";
+import { credit_logs } from "@/lib/schema"
+
+
 
 // Replace the existing getSiteUrl function with this improved version
 function getSiteUrl(): string {
@@ -79,10 +83,17 @@ export async function getAllCampaigns() {
   }
 }
 
+import { deductCredit } from "./user-actions"
 // Generate themes for a campaign
 export async function generateThemes(campaignId: number) {
   console.log("Server action: generateThemes called with campaignId:", campaignId)
+  const { userId } = await auth();
 
+  if (!userId) {
+    throw new Error("Bạn cần đăng nhập để thực hiện hành động này.");
+  }
+  deductCredit(userId, 1, "generate_post");
+  
   try {
     // Kiểm tra FASTAPI_URL
     if (!process.env.FASTAPI_URL) {

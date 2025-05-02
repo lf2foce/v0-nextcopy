@@ -13,6 +13,7 @@ export const users = pgTable("users", {
   image_url: text("image_url"),
   role: text("role").default("user"),
   preferences: jsonb("preferences").default({}),
+  credits_remaining: integer("credits_remaining").default(100).notNull(), // Add credits field
   last_login_at: timestamp("last_login_at"),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
@@ -76,6 +77,15 @@ export const contentPosts = pgTable("content_posts", {
   post_metadata: text("post_metadata"), // Thêm trường post_metadata để lưu trữ metadata của bài đăng
 })
 
+// Credit Logs table
+export const credit_logs = pgTable("credit_logs", {
+  id: serial("id").primaryKey(),
+  user_id: text("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  action: text("action").notNull(),
+  credits_used: integer("credits_used").notNull(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  credit_metadata: jsonb("credit_metadata")
+})
 // Define relations
 export const usersRelations = relations(users, ({ many }) => ({
   campaigns: many(campaigns),

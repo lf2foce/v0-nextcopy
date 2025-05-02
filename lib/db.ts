@@ -1,6 +1,7 @@
 import { neon, neonConfig } from "@neondatabase/serverless"
 import { drizzle } from "drizzle-orm/neon-http"
 import { sql } from "drizzle-orm"
+import * as schema from "./schema"
 
 // Configure neon with improved options
 neonConfig.fetchOptions = {
@@ -36,7 +37,7 @@ function getSqlClient() {
 }
 
 // Create a Drizzle ORM instance with lazy initialization
-export const db = drizzle(getSqlClient())
+export const db = drizzle(getSqlClient(), { schema })
 
 // Test the database connection
 export async function testDatabaseConnection() {

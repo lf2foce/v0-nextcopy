@@ -4,6 +4,7 @@ import { db } from "./db";
 import { users } from "./schema";
 import { eq } from "drizzle-orm";
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { credit_logs } from "@/lib/schema"
 
 // Server action to get or create a user from Clerk
 export async function getOrCreateUser() {
@@ -59,6 +60,7 @@ export async function getOrCreateUser() {
         image_url: clerkUser.imageUrl || "",
         role: "user",
         preferences: {},
+        credits_remaining: 100, // Initialize credits for new user
         created_at: new Date(),
         updated_at: new Date(),
       })
@@ -78,4 +80,33 @@ export async function getOrCreateUser() {
           : "Unknown error occurred while creating user.",
     };
   }
+}
+
+
+type CreditAction = "generate_post" | "generate_image"
+
+export async function deductCredit(
+  userId: string,
+  creditsToUse: number = 1,
+  action: CreditAction
+) {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  })
+
+  if (!user || user.credits_remaining < creditsToUse) {
+    throw new Error("Out of credits")
+  }
+
+  await db
+    .update(users)
+    .set({ credits_remaining: user.credits_remaining - creditsToUse })
+    .where(eq(users.id, userId))
+
+  await db.insert(credit_logs).values({
+    user_id: userId,
+    action,
+    credits_used: creditsToUse,
+    timestamp: new Date(),
+  })
 }
