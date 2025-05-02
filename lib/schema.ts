@@ -27,6 +27,7 @@ export const campaigns = pgTable("campaigns", {
   targetCustomer: text("target_customer"),
   insight: text("insight"),
   description: text("description"),
+  content_type: text("content_type").default("Auto"),
   status: campaignStatusEnum("status").default("draft"),
   currentStep: integer("current_step").default(0).notNull(), // Keep currentStep for tracking progress
   startDate: date("start_date"),

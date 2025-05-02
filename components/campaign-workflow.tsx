@@ -21,6 +21,7 @@ export type Campaign = {
   description: string
   target: string
   insight?: string
+  content_type?: string
   repeatEveryDays: number
   startDate: Date
   currentStep?: number

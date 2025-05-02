@@ -54,6 +54,7 @@ export async function createCampaign(campaignData: any) {
         description: campaignData.description,
         targetCustomer: campaignData.target,
         insight: campaignData.insight || null,
+        content_type: campaignData.content_type || null,
         repeatEveryDays: campaignData.repeatEveryDays || 7,
         startDate: campaignData.startDate ? new Date(campaignData.startDate) : new Date(),
         currentStep: 1, // Set to DRAFT step

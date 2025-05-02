@@ -90,6 +90,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
     description: "",
     target: "",
     insight: "",
+    content_type: "Auto", // Default content type
     repeatEveryDays: 3, // Changed from 7 to 3
     startDate: getTomorrowDate(), // Changed from today to tomorrow
   })
@@ -116,6 +117,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
         description: initialData.description || "",
         target: initialData.target || initialData.targetCustomer || "",
         insight: initialData.insight || "",
+        content_type: initialData.content_type || "Storytelling",
         repeatEveryDays: initialData.repeatEveryDays || 3, // Changed default from 7 to 3
         startDate: initialData.startDate || getTomorrowDate(), // Changed from today to tomorrow
       })
@@ -139,6 +141,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
       description: template.description,
       target: template.targetAudience,
       insight: template.customerInsight, // Use the detailed customer insight
+      content_type: "Storytelling"
     }))
 
     // Show toast only if we haven't shown it for this template yet
@@ -474,6 +477,26 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
             className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
             placeholder="Share deep insights about your target customers' behaviors, motivations, or preferences"
           />
+        </div>
+
+        <div>
+          <label className="block font-bold mb-1" htmlFor="content_type">
+            Content Type
+          </label>
+          <select
+            id="content_type"
+            name="content_type"
+            value={formData.content_type}
+            onChange={handleChange}
+            className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+          >
+            <option value="Auto">Auto - Let the AI choose the best content type based on your description</option>
+            <option value="Storytelling">Storytelling - For emotional brand connection, lifestyle vibes</option>
+            <option value="Tips & Advice">Tips & Advice - Practical, short, high-value tips</option>
+            <option value="Trend Spotting">Trend Spotting - Covers current or upcoming fashion trends</option>
+            <option value="SEO Blog Posts">SEO Blog Posts - Longer-form for website traffic or blog use</option>
+            <option value="Shopee Product Descriptions">Shopee Product Descriptions - Optimized product copy</option>
+          </select>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
