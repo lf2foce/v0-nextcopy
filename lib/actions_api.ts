@@ -7,7 +7,8 @@ import { getCampaignSteps } from "./campaign-steps" // Import from campaign-step
 import { updatePostImages, updateCampaignStep } from "./actions" // Import from actions.ts
 import { desc } from "drizzle-orm" // Add this import for getAllCampaigns
 import { auth } from "@clerk/nextjs/server";
-import { credit_logs } from "@/lib/schema"
+// import { credit_logs } from "@/lib/schema"
+import { deductCredit } from "./user-actions"
 
 
 
@@ -83,7 +84,6 @@ export async function getAllCampaigns() {
   }
 }
 
-import { deductCredit } from "./user-actions"
 // Generate themes for a campaign
 export async function generateThemes(campaignId: number) {
   console.log("Server action: generateThemes called with campaignId:", campaignId)

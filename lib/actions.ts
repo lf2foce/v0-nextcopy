@@ -79,7 +79,7 @@ export async function createCampaign(campaignData: any) {
     generateSystemPrompt(newCampaign)
       .then((result) => {
         if (result.success) {
-          console.log("System prompt generated in background:", result.data)
+          console.log("System prompt generated in background: Done") //, result.data
         } else {
           console.error("Background system prompt generation failed:", result.error)
         }
@@ -440,6 +440,7 @@ export async function getAllCampaigns() {
 export async function generateSystemPrompt(campaignData: any) {
   try {
     if (!campaignData || !campaignData.id) {
+      console.error("Invalid campaign data: Missing required fields (campaignData or campaignData.id)")
       return {
         success: false,
         error: "Invalid campaign data: Missing required fields",
@@ -448,7 +449,10 @@ export async function generateSystemPrompt(campaignData: any) {
 
     // Check for required environment variables
     if (!process.env.NEXT_PUBLIC_SITE_URL && !process.env.VERCEL_URL) {
-      console.error("Missing required environment variables for generateSystemPrompt")
+      console.error("Missing required environment variables for generateSystemPrompt:", {
+        NEXT_PUBLIC_SITE_URL: !!process.env.NEXT_PUBLIC_SITE_URL,
+        VERCEL_URL: !!process.env.VERCEL_URL
+      })
       return {
         success: false,
         error: "Server configuration error: Missing required environment variables",
@@ -458,6 +462,7 @@ export async function generateSystemPrompt(campaignData: any) {
     // Build API URL with proper validation
     let baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
     if (!baseUrl) {
+      console.error("Unable to determine base URL - check environment variables")
       return {
         success: false,
         error: "Unable to determine base URL - check environment variables",
@@ -466,11 +471,12 @@ export async function generateSystemPrompt(campaignData: any) {
     
     // Normalize URL
     baseUrl = baseUrl.trim()
+    console.log("Raw base URL from env:", baseUrl)
     if (baseUrl.endsWith("/")) baseUrl = baseUrl.slice(0, -1)
     if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`
     
     const apiUrl = `${baseUrl}/api/campaigns/generate-system-prompt`
-    console.log("Generating system prompt with URL:", apiUrl)
+    console.log("Generating system prompt with URL:", apiUrl, "for campaign:", campaignData.id)
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -479,15 +485,22 @@ export async function generateSystemPrompt(campaignData: any) {
       cache: "no-store",
     })
 
+    console.log("API Response Status:", response.status, response.statusText)
+    
     if (!response.ok) {
+      const errorText = await response.text().catch(() => "Failed to read error response")
+      console.error("API Error Response:", errorText)
       return {
         success: false,
-        error: `API error (${response.status}): ${response.statusText}`,
+        error: `API error (${response.status}): ${response.statusText}. Response: ${errorText.substring(0, 200)}`,
       }
     }
 
     const result = await response.json()
+    console.log("API Response Data:", result)
+    
     if (!result.success || !result.data) {
+      console.error("API returned unsuccessful response:", result.error || "No data returned")
       return {
         success: false,
         error: result.error || "API returned error or missing data",
@@ -504,9 +517,10 @@ export async function generateSystemPrompt(campaignData: any) {
       data: result.data,
     }
   } catch (error) {
+    console.error("Unexpected error in generateSystemPrompt:", error)
     return {
       success: false,
-      error: "Unexpected error in generateSystemPrompt",
+      error: "Unexpected error in generateSystemPrompt: " + (error instanceof Error ? error.message : String(error)),
     }
   }
 }
