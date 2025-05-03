@@ -140,12 +140,7 @@ IMPORTANT INSTRUCTIONS:
     }
 
     const result = {
-      campaign: parsedContent,
-      _metadata: {
-        generatedAt: new Date().toISOString(),
-        campaignId: campaignData.id,
-        model: "grok-3-fast",
-      },
+      campaign: parsedContent
     }
 
     console.log("🎉 Successfully generated system prompt with Grok-3-Fast model")
