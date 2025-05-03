@@ -180,7 +180,7 @@ export default function PostImageCard({
               </button>
               <span className="text-sm font-medium w-5 text-center">{numImages}</span>
               <button
-                onClick={() => onChangeNumImages(post.id, Math.min(10, numImages + 1))}
+                onClick={() => onChangeNumImages(post.id, Math.min(4, numImages + 1))}
                 disabled={numImages >= 10 || isProcessing}
                 className="text-black hover:text-gray-700 disabled:opacity-50"
                 aria-label="Increase number of images"

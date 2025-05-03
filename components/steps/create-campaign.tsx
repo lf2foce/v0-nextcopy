@@ -510,7 +510,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
               type="number"
               required
               min="1"
-              max="365"
+              max="10"
               value={formData.repeatEveryDays}
               onChange={handleNumberChange}
               className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
