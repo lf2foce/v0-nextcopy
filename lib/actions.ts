@@ -56,12 +56,11 @@ export async function createCampaign(campaignData: any) {
         insight: campaignData.insight || null,
         content_type: campaignData.content_type || "Auto",
         repeatEveryDays: campaignData.repeatEveryDays || 7,
-        startDate: campaignData.startDate ? new Date(campaignData.startDate) : new Date(),
+        startDate: campaignData.startDate ? new Date(campaignData.startDate).toISOString() : new Date().toISOString(),
         currentStep: 1, // Set to DRAFT step
-        createdAt: new Date(),
-        updatedAt: new Date(),
         status: "draft",
-        isActive: true
+        isActive: true,
+        campaignData: null
       })
       .returning()
 

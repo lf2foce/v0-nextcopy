@@ -71,15 +71,6 @@ Create a comprehensive marketing campaign strategy in JSON format with the follo
   "platforms": [
     "Suitable platforms (e.g., Facebook, Instagram, LinkedIn)"
   ],
-  "contentTypes": [
-    {
-      "platform": "Platform name",
-      "topicStyle": "Content style",
-      "suggestedContentTypes": [
-        "2-4 content format suggestions"
-      ]
-    }
-  ],
   "callsToAction": [
     "2-3 strong calls to action"
   ],

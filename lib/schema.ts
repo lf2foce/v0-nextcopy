@@ -35,7 +35,7 @@ export const campaigns = pgTable("campaigns", {
   lastRunDate: date("last_run_date"),
   nextRunDate: date("next_run_date"),
   isActive: boolean("is_active").default(true),
-  campaignData: text("campaign_data"), // Column to store campaign system prompt data as JSON text
+  campaignData: jsonb("campaign_data"), // Column to store campaign system prompt data as JSONB
 })
 
 // Themes table
