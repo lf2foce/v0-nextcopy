@@ -547,7 +547,7 @@ export async function generateSystemPrompt(campaignData: any) {
         await db
           .update(campaigns)
           .set({
-            campaignData: JSON.stringify(result.data),
+            campaignData: result.data,
           })
           .where(eq(campaigns.id, campaignData.id))
 
