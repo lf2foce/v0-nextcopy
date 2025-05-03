@@ -92,7 +92,7 @@ export async function generateThemes(campaignId: number) {
   if (!userId) {
     throw new Error("Bạn cần đăng nhập để thực hiện hành động này.");
   }
-  deductCredit(userId, 1, "generate_post");
+  await deductCredit(userId, 1, "generate_post");
   
   try {
     // Kiểm tra FASTAPI_URL

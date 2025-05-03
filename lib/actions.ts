@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { desc } from "drizzle-orm" // Add this import for getAllCampaigns
 import { getCampaignSteps } from "./campaign-steps" // Import campaign steps
+import { getOrCreateUser } from "./user-actions"
 
 // Define campaign steps
 const CAMPAIGN_STEPS = {
@@ -22,7 +23,6 @@ const CAMPAIGN_STEPS = {
 // Find the createCampaign function and modify it to trigger system prompt generation
 // after creating the campaign but without awaiting its completion
 
-import { getOrCreateUser } from "./user-actions"
 
 export async function createCampaign(campaignData: any) {
   console.log("Creating campaign with data:", campaignData)
@@ -54,12 +54,14 @@ export async function createCampaign(campaignData: any) {
         description: campaignData.description,
         targetCustomer: campaignData.target,
         insight: campaignData.insight || null,
-        content_type: campaignData.content_type || null,
+        content_type: campaignData.content_type || "Auto",
         repeatEveryDays: campaignData.repeatEveryDays || 7,
         startDate: campaignData.startDate ? new Date(campaignData.startDate) : new Date(),
         currentStep: 1, // Set to DRAFT step
         createdAt: new Date(),
         updatedAt: new Date(),
+        status: "draft",
+        isActive: true
       })
       .returning()
 
@@ -445,11 +447,31 @@ export async function generateSystemPrompt(campaignData: any) {
       }
     }
 
-    // Always server-side: build API URL
-    let baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL || "http://localhost:3000"
+    // Check for required environment variables
+    if (!process.env.NEXT_PUBLIC_SITE_URL && !process.env.VERCEL_URL) {
+      console.error("Missing required environment variables for generateSystemPrompt")
+      return {
+        success: false,
+        error: "Server configuration error: Missing required environment variables",
+      }
+    }
+
+    // Build API URL with proper validation
+    let baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
+    if (!baseUrl) {
+      return {
+        success: false,
+        error: "Unable to determine base URL - check environment variables",
+      }
+    }
+    
+    // Normalize URL
+    baseUrl = baseUrl.trim()
     if (baseUrl.endsWith("/")) baseUrl = baseUrl.slice(0, -1)
     if (!baseUrl.startsWith("http")) baseUrl = `https://${baseUrl}`
+    
     const apiUrl = `${baseUrl}/api/campaigns/generate-system-prompt`
+    console.log("Generating system prompt with URL:", apiUrl)
 
     const response = await fetch(apiUrl, {
       method: "POST",
