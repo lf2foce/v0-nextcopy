@@ -36,9 +36,59 @@ export function CreditsDisplay() {
   }
 
   return (
-    <div className="flex items-center gap-2 bg-white border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] px-3 py-1.5">
-      <span className="font-mono font-bold text-black">Credits:</span>
-      <span className="font-mono font-black text-blue-600">{credits}</span>
+    <div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full">
+      <div className="flex -space-x-1">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <circle
+            cx="12"
+            cy="12"
+            r="9"
+            fill="#FFC107"
+            stroke="#B8860B"
+            strokeWidth="1.5"
+          />
+          <circle
+            cx="12"
+            cy="12"
+            r="6"
+            fill="#FFD700"
+            stroke="#B8860B"
+            strokeWidth="0.5"
+          />
+        </svg>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="relative -left-1"
+        >
+          <circle
+            cx="12"
+            cy="12"
+            r="9"
+            fill="#FFC107"
+            stroke="#B8860B"
+            strokeWidth="1.5"
+          />
+          <circle
+            cx="12"
+            cy="12"
+            r="6"
+            fill="#FFD700"
+            stroke="#B8860B"
+            strokeWidth="0.5"
+          />
+        </svg>
+      </div>
+      <span className="font-medium text-sm">{credits}</span>
     </div>
   );
 }
