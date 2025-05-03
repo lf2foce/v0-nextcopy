@@ -36,11 +36,9 @@ export function CreditsDisplay() {
   }
 
   return (
-    <div className="fixed top-4 right-4 bg-white/80 backdrop-blur-sm rounded-lg shadow-md px-4 py-2 border border-gray-200 z-50">
-      <div className="flex items-center gap-2">
-        <span className="font-medium text-gray-700">Credits:</span>
-        <span className="font-bold text-indigo-600">{credits}</span>
-      </div>
+    <div className="flex items-center gap-2 bg-white border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] px-3 py-1.5">
+      <span className="font-mono font-bold text-black">Credits:</span>
+      <span className="font-mono font-black text-blue-600">{credits}</span>
     </div>
   );
 }

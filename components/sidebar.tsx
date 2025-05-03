@@ -3,16 +3,15 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Flag, PlusCircle, Menu, X, Database, LogIn, Globe } from "lucide-react"
-import { SignInButton, UserButton, useUser } from "@clerk/nextjs"
+import { LayoutDashboard, Flag, PlusCircle, Menu, X, Database, LogIn } from "lucide-react"
 import { useLanguage } from "@/contexts/language-context"
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const { isLoaded, isSignedIn } = useUser()
+  
   const [isOpen, setIsOpen] = useState(true)
   const [isMobile, setIsMobile] = useState(false)
-  const { language, setLanguage, translations } = useLanguage()
+  const { language, translations } = useLanguage()
 
   // Check if we're on mobile and close sidebar by default
   useEffect(() => {
@@ -66,37 +65,12 @@ export default function Sidebar() {
               <h1 className="text-xl font-black">Campaign Manager</h1>
               <div className="h-4 w-4 bg-yellow-300 rounded-full mt-1 border-2 border-black"></div>
             </div>
-            {isSignedIn && isLoaded && (
-              <UserButton
-                afterSignOutUrl="/"
-                appearance={{
-                  elements: {
-                    avatarBox: "h-8 w-8"
-                  }
-                }}
-              />
-            )}
           </div>
         </div>
 
         <div className="p-4">
           <nav className="space-y-1">
-            <button
-              onClick={() => setLanguage(language === 'en' ? 'vi' : 'en')}
-              className="flex items-center w-full py-3 px-4 rounded-md font-medium transition-colors hover:bg-gray-100 border-2 border-transparent"
-            >
-              <Globe className="mr-2" size={20} />
-              <span>{translations.languageSwitch}</span>
-            </button>
-
-            {!isSignedIn && isLoaded && (
-              <SignInButton mode="modal">
-                <button className="flex items-center w-full py-3 px-4 rounded-md font-medium transition-colors hover:bg-gray-100 border-2 border-transparent">
-                  <LogIn className="mr-2" size={20} />
-                  <span>{translations.signIn}</span>
-                </button>
-              </SignInButton>
-            )}
+            {/* Remove the SignInButton section from here */}
             <Link
               href="/guide"
               className={`flex items-center w-full py-3 px-4 rounded-md font-medium transition-colors ${
@@ -125,20 +99,7 @@ export default function Sidebar() {
 
             {/* Templates and Content links removed */}
 
-            {isSignedIn && (
-              <Link
-                href="/admin"
-                className={`flex items-center w-full py-3 px-4 rounded-md font-medium transition-colors ${
-                  isActive("/admin")
-                    ? "bg-yellow-300 border-2 border-black"
-                    : "hover:bg-gray-100 border-2 border-transparent"
-                }`}
-                onClick={() => isMobile && setIsOpen(false)}
-              >
-                <Database className="mr-2" size={20} />
-                <span>{translations.admin}</span>
-              </Link>
-            )}
+           
           </nav>
 
           <div className="mt-6">

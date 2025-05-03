@@ -8,10 +8,14 @@ import Sidebar from "@/components/sidebar"
 import { Analytics } from "@vercel/analytics/react"
 import { LanguageProvider } from "@/contexts/language-context"
 import { CreditsDisplay } from "@/components/CreditsDisplay"
-
+import { UserButton } from '@clerk/nextjs';
+import TranslationButton from '@/components/TranslationButton';
 import {
-  ClerkProvider
+  ClerkProvider,
+  SignedIn,
+  SignInButton
 } from '@clerk/nextjs'
+import AuthButtons from "@/components/AuthButtons" // New client component
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -36,10 +40,16 @@ export default function RootLayout({
               <div className="flex min-h-screen">
                 <Sidebar />
                 <main className="flex-1 p-4 md:p-6 lg:p-10 bg-yellow-50 w-full overflow-x-hidden">
+                  <div className="flex justify-end items-center gap-4 mb-6">
+                    <SignedIn> 
+                      <CreditsDisplay />
+                    </SignedIn>
+                    <TranslationButton />
+                    <AuthButtons />
+                  </div>
                   {children}
                   <Analytics />
                 </main>
-                <CreditsDisplay />
               </div>
             </SidebarProvider>
           </LanguageProvider>
