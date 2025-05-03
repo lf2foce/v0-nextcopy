@@ -143,7 +143,7 @@ IMPORTANT INSTRUCTIONS:
       campaign: parsedContent
     }
 
-    console.log("🎉 Successfully generated system prompt with Grok-3-Fast model")
+    console.log("🎉 Successfully generated system prompt with Grok-3-Fast model", result)
 
     return NextResponse.json({
       success: true,
