@@ -542,12 +542,38 @@ export async function generateSystemPrompt(campaignData: any) {
         }
       }
 
+      // Log the full result structure to debug production issues
+      console.log("API response structure:", JSON.stringify({
+        resultKeys: Object.keys(result),
+        dataKeys: result.data ? Object.keys(result.data) : null,
+        campaignExists: result.data && result.data.campaign ? true : false
+      }))
+
       // Update the campaign with the generated system prompt data
       try {
+        // Handle different possible response structures
+        let campaignDataToSave = null
+        
+        if (result.data && result.data.campaign) {
+          // Original expected structure
+          campaignDataToSave = result.data.campaign
+          console.log("Using result.data.campaign structure")
+        } else if (result.data && typeof result.data === 'object') {
+          // Alternative: the data itself might be the campaign object
+          campaignDataToSave = result.data
+          console.log("Using result.data directly as campaign data")
+        }
+        
+        // Log what we're saving
+        console.log("Campaign data to save (first 100 chars):", 
+          typeof campaignDataToSave === 'string' 
+            ? campaignDataToSave.substring(0, 100) 
+            : JSON.stringify(campaignDataToSave).substring(0, 100))
+
         await db
           .update(campaigns)
           .set({
-            campaignData: result.data.campaign,
+            campaignData: campaignDataToSave,
           })
           .where(eq(campaigns.id, campaignData.id))
 
