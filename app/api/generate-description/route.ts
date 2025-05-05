@@ -100,7 +100,8 @@ Important:
       try {
         // Using Llama 4 Scout model from Cerebras instead of OpenAI
         const { text } = await generateText({
-          model: cerebras("llama3.3-70b"), // Using Llama 4 Scout model
+          // model: cerebras("llama3.3-70b"), // Using Llama 4 Scout model
+          model: cerebras("llama-4-scout-17b-16e-instruct"), // Using Llama 4 Scout model
           //model: openai("gpt-4o-mini")
           system: systemPrompt,
           prompt: prompt,
