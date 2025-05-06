@@ -501,7 +501,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
 
             {/* Custom Theme Option */}
             <div
-              className={`border-4 ${selectedThemeId === customTheme?.id ? "border-yellow-400 bg-yellow-50" : "border-black"} rounded-md p-4 cursor-pointer transition-all ${isEditingCustomTheme ? "col-span-full" : ""}`}
+              className={`border-4 ${selectedThemeId === customTheme?.id ? "border-yellow-400 bg-yellow-50" : "border-black"} rounded-md p-4 cursor-pointer transition-all`}
               onClick={() =>
                 !isSelecting && !isEditingCustomTheme && customTheme && handleThemeSelection(customTheme.id)
               }
@@ -559,7 +559,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            setIsEditingCustomTheme(false)
+                            toggleCustomThemeEditor()
                           }}
                           className="py-2 px-4 bg-gray-200 border-2 border-black rounded-md font-medium hover:bg-gray-300"
                         >
@@ -567,67 +567,29 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
                         </button>
                       </div>
                     </div>
-                  ) : customTheme ? (
-                    <>
-                      <h3 className="font-bold text-lg">{customTheme.title}</h3>
-                      <p className="text-gray-700 mb-2">{customTheme.story}</p>
-
-                      {/* Simplified Custom Theme Content Plan */}
-                      {customTheme.content_plan && (
-                        <div className="mt-4 border-t-2 border-black pt-3">
-                          <h4 className="font-bold text-md mb-2">Kế hoạch bài viết:</h4>
-                          <div className="space-y-2">
-                            {(() => {
-                              try {
-                                const contentPlan = parseContentPlan(customTheme.content_plan)
-
-                                if (contentPlan && contentPlan.items && Array.isArray(contentPlan.items)) {
-                                  return contentPlan.items.map((item, index) => (
-                                    <div key={index} className="border border-gray-200 p-2 rounded-md bg-white">
-                                      <p className="font-medium text-sm">{item.title}</p>
-                                    </div>
-                                  ))
-                                }
-                                return <p className="text-sm italic">Không có kế hoạch bài viết chi tiết</p>
-                              } catch (e) {
-                                console.error("Error rendering custom content plan:", e)
-                                return <p className="text-sm italic text-red-500">Lỗi hiển thị kế hoạch bài viết</p>
-                              }
-                            })()}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex gap-2 mt-3">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setCustomThemeTitle(customTheme.title || "")
-                            setCustomThemeDescription(customTheme.story || "")
-                            setIsEditingCustomTheme(true)
-                          }}
-                          className="py-1 px-3 bg-blue-300 border-2 border-black rounded-md hover:bg-blue-400 text-sm"
-                        >
-                          Edit Custom Theme
-                        </button>
-                      </div>
-                    </>
                   ) : (
-                    <>
-                      <h3 className="font-bold text-lg">Create Your Own Theme</h3>
-                      <p className="text-gray-700 mb-2">
-                        Don't like the generated themes? Create your own custom theme.
-                      </p>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleCustomThemeEditor()
-                        }}
-                        className="py-1 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 text-sm"
-                      >
-                        Create Custom Theme
-                      </button>
-                    </>
+                    <div>
+                      {customTheme ? (
+                        <>
+                          <h3 className="font-bold text-lg">{customTheme.title}</h3>
+                          <p className="text-gray-700 mb-2">{customTheme.story}</p>
+                        </>
+                      ) : (
+                        <>
+                          <h3 className="font-bold text-lg">Create Custom Theme</h3>
+                          <p className="text-gray-700 mb-2">Add your own custom theme</p>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleCustomThemeEditor()
+                            }}
+                            className="py-2 px-4 bg-green-400 border-2 border-black rounded-md font-medium hover:bg-green-500"
+                          >
+                            Create Theme
+                          </button>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

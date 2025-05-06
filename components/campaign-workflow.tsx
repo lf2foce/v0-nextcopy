@@ -58,7 +58,7 @@ export type Post = {
 }
 
 // Updated steps - added Video step between Images and Review
-const steps = ["New campaign", "Themes", "Content", "Images", "Video", "Review", "Schedule"]
+const steps = ["Idea", "Themes", "Content", "Images", "Video", "Review", "Schedule"]
 
 // Map database steps to UI steps
 const dbToUiStepMap = {
