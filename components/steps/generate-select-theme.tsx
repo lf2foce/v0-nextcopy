@@ -434,7 +434,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
             {themes.map((theme) => (
               <div
                 key={theme.id}
-                className={`border-4 ${selectedThemeId === theme.id ? "border-yellow-400 bg-yellow-50" : "border-black"} rounded-md p-4 cursor-pointer transition-all`}
+                className={`border-4 ${selectedThemeId === theme.id ? "border-green-400 bg-green-50" : "border-black"} rounded-md p-4 cursor-pointer transition-all`}
                 onClick={() => !isSelecting && handleThemeSelection(theme.id)}
               >
                 <div className="flex items-start gap-3">
@@ -552,7 +552,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
                             e.stopPropagation()
                             handleCreateCustomTheme()
                           }}
-                          className="py-2 px-4 bg-green-400 border-2 border-black rounded-md font-medium hover:bg-green-500"
+                          className="py-1 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 text-sm"
                         >
                           Save Custom Theme
                         </button>
@@ -583,7 +583,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
                               e.stopPropagation()
                               toggleCustomThemeEditor()
                             }}
-                            className="py-2 px-4 bg-green-400 border-2 border-black rounded-md font-medium hover:bg-green-500"
+                            className="py-1 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 text-sm"
                           >
                             Create Theme
                           </button>
