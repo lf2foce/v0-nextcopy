@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import type { Campaign, Theme } from "../campaign-workflow"
-import { Loader2, RefreshCw } from "lucide-react"
+import { Loader2, RefreshCw, AlertCircle } from "lucide-react"
 import { generateThemes, selectTheme } from "@/lib/actions_api"
 import { useToast } from "@/hooks/use-toast"
 
@@ -13,29 +13,34 @@ interface GenerateSelectThemeProps {
 }
 
 export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack }: GenerateSelectThemeProps) {
-  const [isLoading, setIsLoading] = useState(true)
+  // Use refs to track component state and prevent unnecessary API calls
+  const initialFetchMade = useRef(false)
+  const isMounted = useRef(true)
+  const campaignId = useRef<number | null>(null)
+
+  // State management
+  const [isLoading, setIsLoading] = useState(false)
+  const [isError, setIsError] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
   const [isSelecting, setIsSelecting] = useState(false)
   const [themes, setThemes] = useState<Theme[]>([])
   const [selectedThemeId, setSelectedThemeId] = useState<string | number | null>(null)
   const { toast } = useToast()
 
-  // Add a new state for custom theme at the top of the component with the other state declarations
+  // Custom theme state
   const [customTheme, setCustomTheme] = useState<Theme | null>(null)
   const [customThemeTitle, setCustomThemeTitle] = useState("")
   const [customThemeDescription, setCustomThemeDescription] = useState("")
   const [isEditingCustomTheme, setIsEditingCustomTheme] = useState(false)
   const [isSavingCustomTheme, setIsSavingCustomTheme] = useState(false)
 
-  // Generate themes when component mounts
-  useEffect(() => {
-    if (campaign && campaign.id) {
-      generateAndSaveThemes()
-    }
-  }, [campaign])
-
-  // Function to generate themes
-  const generateAndSaveThemes = async () => {
-    if (!campaign.id) {
+  // Generate themes function with useCallback to prevent unnecessary re-renders
+  const generateAndSaveThemes = useCallback(async () => {
+    // Validate campaign ID
+    if (!campaign?.id) {
+      setErrorMessage("Campaign ID is missing. Please try again.")
+      setIsError(true)
+      setIsLoading(false)
       toast({
         title: "Error",
         description: "Campaign ID is missing. Please try again.",
@@ -44,14 +49,22 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
       return
     }
 
+    // Update state for loading
     setIsLoading(true)
-    setSelectedThemeId(null) // Reset selection when regenerating
+    setIsError(false)
+    setErrorMessage("")
+    setSelectedThemeId(null)
 
     try {
-      // Call the server action to generate themes from the external API
+      console.log(`Generating themes for campaign ID: ${campaign.id}`)
+
+      // Call the server action to generate themes
       const result = await generateThemes(campaign.id)
 
-      if (result.success) {
+      // Check if component is still mounted before updating state
+      if (!isMounted.current) return
+
+      if (result.success && result.data && Array.isArray(result.data)) {
         console.log("Themes generated successfully. Count:", result.data.length)
         setThemes(result.data)
 
@@ -62,33 +75,63 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
           })
         }
       } else {
+        console.error("Theme generation failed:", result.error)
+        setIsError(true)
+        setErrorMessage(result.error || "Failed to generate themes")
         toast({
           title: "Error",
           description: result.error || "Failed to generate themes",
           variant: "destructive",
         })
-        setThemes([])
       }
     } catch (error) {
+      // Check if component is still mounted before updating state
+      if (!isMounted.current) return
+
       console.error("Theme generation error:", error)
+      setIsError(true)
+      setErrorMessage("An unexpected error occurred while generating themes")
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description: "An unexpected error occurred while generating themes",
         variant: "destructive",
       })
-      setThemes([])
     } finally {
-      setIsLoading(false)
+      // Check if component is still mounted before updating state
+      if (isMounted.current) {
+        setIsLoading(false)
+      }
     }
-  }
+  }, [campaign?.id, toast])
 
-  // Function to handle theme selection
-  const handleThemeSelection = async (themeId: string | number) => {
+  // Effect to fetch themes on mount
+  useEffect(() => {
+    // Set the mounted ref
+    isMounted.current = true
+
+    // Store campaign ID in ref to compare later
+    campaignId.current = campaign?.id || null
+
+    // Only fetch if we have a campaign ID and haven't fetched yet
+    if (campaign?.id && !initialFetchMade.current) {
+      console.log("Initial theme generation for campaign ID:", campaign.id)
+      initialFetchMade.current = true
+      generateAndSaveThemes()
+    }
+
+    // Cleanup function
+    return () => {
+      isMounted.current = false
+    }
+  }, [campaign?.id, generateAndSaveThemes])
+
+  // Handle theme selection
+  const handleThemeSelection = useCallback((themeId: string | number) => {
     setSelectedThemeId(themeId)
-  }
+  }, [])
 
   // Function to safely parse content plan
-  const parseContentPlan = (contentPlanData: any) => {
+  const parseContentPlan = useCallback((contentPlanData: any) => {
     if (!contentPlanData) return null
 
     // If it's already an object, return it
@@ -105,69 +148,74 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
     }
 
     return null
-  }
+  }, [])
 
   // Function to save custom theme to database
-  const saveCustomThemeToDatabase = async (customTheme: Theme): Promise<Theme | null> => {
-    if (!campaign.id) {
-      toast({
-        title: "Error",
-        description: "Campaign ID is missing. Cannot save custom theme.",
-        variant: "destructive",
-      })
-      return null
-    }
-
-    try {
-      setIsSavingCustomTheme(true)
-
-      // Prepare theme data for database
-      const themeData = {
-        campaignId: campaign.id,
-        title: customTheme.title || "",
-        story: customTheme.story || "",
-        isSelected: true, // Mark as selected by default
-        status: "selected",
-        post_status: "pending", // Start with pending status
-        content_plan: customTheme.content_plan || null, // Include content plan
+  const saveCustomThemeToDatabase = useCallback(
+    async (customTheme: Theme): Promise<Theme | null> => {
+      if (!campaign?.id) {
+        toast({
+          title: "Error",
+          description: "Campaign ID is missing. Cannot save custom theme.",
+          variant: "destructive",
+        })
+        return null
       }
 
-      // Use server action to save the theme
-      const response = await fetch("/api/themes/create-custom", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(themeData),
-      })
+      try {
+        setIsSavingCustomTheme(true)
 
-      if (!response.ok) {
-        throw new Error(`Failed to save custom theme: ${response.status}`)
+        // Prepare theme data for database
+        const themeData = {
+          campaignId: campaign.id,
+          title: customTheme.title || "",
+          story: customTheme.story || "",
+          isSelected: true, // Mark as selected by default
+          status: "selected",
+          post_status: "pending", // Start with pending status
+          content_plan: customTheme.content_plan || null, // Include content plan
+        }
+
+        // Use server action to save the theme
+        const response = await fetch("/api/themes/create-custom", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(themeData),
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to save custom theme: ${response.status}`)
+        }
+
+        const result = await response.json()
+
+        if (!result.success) {
+          throw new Error(result.error || "Failed to save custom theme")
+        }
+
+        // Return the saved theme with database ID
+        return result.data
+      } catch (error) {
+        console.error("Error saving custom theme:", error)
+        toast({
+          title: "Error",
+          description: "Failed to save custom theme: " + (error instanceof Error ? error.message : String(error)),
+          variant: "destructive",
+        })
+        return null
+      } finally {
+        if (isMounted.current) {
+          setIsSavingCustomTheme(false)
+        }
       }
+    },
+    [campaign?.id, toast],
+  )
 
-      const result = await response.json()
-
-      if (!result.success) {
-        throw new Error(result.error || "Failed to save custom theme")
-      }
-
-      // Return the saved theme with database ID
-      return result.data
-    } catch (error) {
-      console.error("Error saving custom theme:", error)
-      toast({
-        title: "Error",
-        description: "Failed to save custom theme: " + (error instanceof Error ? error.message : String(error)),
-        variant: "destructive",
-      })
-      return null
-    } finally {
-      setIsSavingCustomTheme(false)
-    }
-  }
-
-  // Add this function to handle custom theme creation after the handleThemeSelection function
-  const handleCreateCustomTheme = () => {
+  // Handle custom theme creation
+  const handleCreateCustomTheme = useCallback(() => {
     if (!customThemeTitle.trim()) {
       toast({
         title: "Error",
@@ -199,7 +247,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
       id: `custom-${Date.now()}`,
       title: customThemeTitle,
       story: customThemeDescription,
-      campaignId: campaign.id,
+      campaignId: campaign?.id,
       isSelected: false,
       status: "pending",
       content_plan: JSON.stringify(basicContentPlan),
@@ -208,18 +256,20 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
     setCustomTheme(newCustomTheme)
     setSelectedThemeId(newCustomTheme.id)
     setIsEditingCustomTheme(false)
-  }
+  }, [campaign?.id, customThemeDescription, customThemeTitle, toast])
 
-  // Add this function to toggle the custom theme editor
-  const toggleCustomThemeEditor = () => {
-    setIsEditingCustomTheme(!isEditingCustomTheme)
-    if (!isEditingCustomTheme) {
-      setSelectedThemeId(null)
-    }
-  }
+  // Toggle custom theme editor
+  const toggleCustomThemeEditor = useCallback(() => {
+    setIsEditingCustomTheme((prev) => {
+      if (!prev) {
+        setSelectedThemeId(null)
+      }
+      return !prev
+    })
+  }, [])
 
-  // Function to handle theme selection and continue
-  const handleContinue = async () => {
+  // Handle continue button click
+  const handleContinue = useCallback(async () => {
     if (!selectedThemeId) {
       toast({
         title: "No theme selected",
@@ -315,11 +365,11 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
         description: "An unexpected error occurred",
         variant: "destructive",
       })
-      setIsSelecting(false)
+      if (isMounted.current) {
+        setIsSelecting(false)
+      }
     }
-  }
-
-  const allThemes = [...themes]
+  }, [selectedThemeId, customTheme, saveCustomThemeToDatabase, themes, onThemeSelected, toast])
 
   return (
     <div className="space-y-6">
@@ -331,15 +381,15 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
       <div className="bg-purple-50 border-4 border-black rounded-md p-4 mb-6">
         <h3 className="font-bold text-lg mb-2">Campaign Details</h3>
         <p>
-          <span className="font-bold">Name:</span> {campaign.name || campaign.title}
+          <span className="font-bold">Name:</span> {campaign?.name || campaign?.title}
         </p>
         <p>
-          <span className="font-bold">Description:</span> {campaign.description}
+          <span className="font-bold">Description:</span> {campaign?.description}
         </p>
         <p>
-          <span className="font-bold">Target:</span> {campaign.target || campaign.targetCustomer}
+          <span className="font-bold">Target:</span> {campaign?.target || campaign?.targetCustomer}
         </p>
-        {campaign.insight && (
+        {campaign?.insight && (
           <p>
             <span className="font-bold">Insight:</span> {campaign.insight}
           </p>
@@ -351,6 +401,20 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
           <div className="flex flex-col items-center">
             <Loader2 size={40} className="animate-spin text-black mb-4" />
             <p className="text-lg font-medium">Generating themes...</p>
+          </div>
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center py-12 px-4">
+          <div className="flex flex-col items-center text-center max-w-md">
+            <AlertCircle size={40} className="text-red-500 mb-4" />
+            <h3 className="text-xl font-bold mb-2">Failed to generate themes</h3>
+            <p className="text-gray-600 mb-6">{errorMessage}</p>
+            <button
+              onClick={generateAndSaveThemes}
+              className="py-2 px-6 bg-black text-white font-medium rounded-md hover:bg-gray-800"
+            >
+              Try Again
+            </button>
           </div>
         </div>
       ) : (
@@ -367,7 +431,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {allThemes.map((theme) => (
+            {themes.map((theme) => (
               <div
                 key={theme.id}
                 className={`border-4 ${selectedThemeId === theme.id ? "border-yellow-400 bg-yellow-50" : "border-black"} rounded-md p-4 cursor-pointer transition-all`}
