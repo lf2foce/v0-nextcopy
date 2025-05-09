@@ -371,6 +371,32 @@ export async function getCampaignWithStep(campaignId: number) {
 }
 
 // Update campaign step
+export async function updateCampaign(campaignId: number, data: {
+  name: string
+  description: string
+  target: string
+  insight: string
+}) {
+  try {
+    const [updatedCampaign] = await db
+      .update(campaigns)
+      .set({
+        title: data.name,
+        description: data.description,
+        targetCustomer: data.target,
+        insight: data.insight
+      })
+      .where(eq(campaigns.id, campaignId))
+      .returning()
+
+    revalidatePath(`/campaigns/${campaignId}`)
+    return updatedCampaign
+  } catch (error) {
+    console.error('Failed to update campaign:', error)
+    return null
+  }
+}
+
 export async function updateCampaignStep(campaignId: number, step: number) {
   try {
     console.log(`Updating campaign ${campaignId} to step ${step}`)

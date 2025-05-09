@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import type { Campaign, Theme } from "../campaign-workflow"
 import { Loader2, RefreshCw, AlertCircle } from "lucide-react"
 import { generateThemes, selectTheme } from "@/lib/actions_api"
+import { updateCampaign } from "@/lib/actions"
 import { useToast } from "@/hooks/use-toast"
 
 interface GenerateSelectThemeProps {
@@ -26,6 +27,69 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
   const [themes, setThemes] = useState<Theme[]>([])
   const [selectedThemeId, setSelectedThemeId] = useState<string | number | null>(null)
   const { toast } = useToast()
+
+  // Campaign edit state
+  const [isEditingCampaign, setIsEditingCampaign] = useState(false)
+  const [isSavingCampaign, setIsSavingCampaign] = useState(false)
+  const [campaignName, setCampaignName] = useState(campaign?.name || campaign?.title || "")
+  const [campaignDescription, setCampaignDescription] = useState(campaign?.description || "")
+  const [campaignTarget, setCampaignTarget] = useState(campaign?.target || campaign?.targetCustomer || "")
+  const [campaignInsight, setCampaignInsight] = useState(campaign?.insight || "")
+
+  // Function to save campaign updates
+  const saveCampaignUpdates = useCallback(async () => {
+    if (!campaign?.id) {
+      toast({
+        title: "Error",
+        description: "Campaign ID is missing. Cannot save updates.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSavingCampaign(true)
+
+    try {
+      const updatedCampaign = await updateCampaign(campaign.id, {
+          name: campaignName,
+          description: campaignDescription,
+          target: campaignTarget,
+          insight: campaignInsight
+        })
+
+      if (!updatedCampaign) {
+        throw new Error("Failed to save campaign")
+      }
+
+      toast({
+        title: "Success",
+        description: "Campaign updated successfully",
+      })
+
+      // Update local state with returned campaign data
+      setCampaignName(updatedCampaign.name || updatedCampaign.title || "")
+      setCampaignDescription(updatedCampaign.description || "")
+      setCampaignTarget(updatedCampaign.target || updatedCampaign.targetCustomer || "")
+      setCampaignInsight(updatedCampaign.insight || "")
+      
+      // Force UI to update by toggling edit mode
+      setIsEditingCampaign(false)
+      
+      return updatedCampaign
+    } catch (error) {
+      console.error("Error saving campaign:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save campaign: " + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive",
+      })
+      return null
+    } finally {
+      if (isMounted.current) {
+        setIsSavingCampaign(false)
+      }
+    }
+  }, [campaign?.id, campaignName, campaignDescription, campaignTarget, campaignInsight, toast])
 
   // Custom theme state
   const [customTheme, setCustomTheme] = useState<Theme | null>(null)
@@ -379,20 +443,91 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
       </div>
 
       <div className="bg-purple-50 border-4 border-black rounded-md p-4 mb-6">
-        <h3 className="font-bold text-lg mb-2">Campaign Details</h3>
-        <p>
-          <span className="font-bold">Name:</span> {campaign?.name || campaign?.title}
-        </p>
-        <p>
-          <span className="font-bold">Description:</span> {campaign?.description}
-        </p>
-        <p>
-          <span className="font-bold">Target:</span> {campaign?.target || campaign?.targetCustomer}
-        </p>
-        {campaign?.insight && (
-          <p>
-            <span className="font-bold">Insight:</span> {campaign.insight}
-          </p>
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="font-bold text-lg">Campaign Details</h3>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setIsEditingCampaign(!isEditingCampaign)}
+              className="py-1 px-3 bg-gray-200 border-2 border-black rounded-md hover:bg-gray-300 text-sm"
+            >
+              {isEditingCampaign ? 'Cancel' : 'Edit'}
+            </button>
+            {isEditingCampaign && (
+              <button
+                onClick={async () => {
+                  await saveCampaignUpdates();
+                  setIsEditingCampaign(false);
+                }}
+                disabled={isSavingCampaign}
+                className="py-1 px-3 bg-green-500 border-2 border-black rounded-md hover:bg-green-600 text-sm disabled:opacity-70"
+              >
+                {isSavingCampaign ? (
+                  <span className="flex items-center justify-center">
+                    <Loader2 className="animate-spin mr-1" size={14} />
+                    Saving...
+                  </span>
+                ) : (
+                  "Save"
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+        
+        {isEditingCampaign ? (
+          <div className="space-y-3">
+            <div>
+              <label className="block font-bold mb-1">Name</label>
+              <input
+                type="text"
+                value={campaignName}
+                onChange={(e) => setCampaignName(e.target.value)}
+                className="w-full p-2 border-2 border-black rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block font-bold mb-1">Description</label>
+              <textarea
+                value={campaignDescription}
+                onChange={(e) => setCampaignDescription(e.target.value)}
+                className="w-full p-2 border-2 border-black rounded-md min-h-[80px]"
+              />
+            </div>
+            <div>
+              <label className="block font-bold mb-1">Target</label>
+              <input
+                type="text"
+                value={campaignTarget}
+                onChange={(e) => setCampaignTarget(e.target.value)}
+                className="w-full p-2 border-2 border-black rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block font-bold mb-1">Insight</label>
+              <textarea
+                value={campaignInsight}
+                onChange={(e) => setCampaignInsight(e.target.value)}
+                className="w-full p-2 border-2 border-black rounded-md min-h-[80px]"
+              />
+            </div>
+          </div>
+        ) : (
+          <div>
+            <p>
+              <span className="font-bold">Name:</span> {campaignName}
+            </p>
+            <p>
+              <span className="font-bold">Description:</span> {campaignDescription}
+            </p>
+            <p>
+              <span className="font-bold">Target:</span> {campaignTarget}
+            </p>
+            {campaign?.insight && (
+              <p>
+                <span className="font-bold">Insight:</span> {campaignInsight}
+              </p>
+            )}
+          </div>
         )}
       </div>
 
