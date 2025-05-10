@@ -456,7 +456,6 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
             id="target"
             name="target"
             type="text"
-            required
             value={formData.target}
             onChange={handleChange}
             className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
@@ -502,19 +501,19 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block font-bold mb-1" htmlFor="repeatEveryDays">
-              Number of Posts to Generate
+              Number of Posts to Generate: <span className="text-green-400 font-black">{formData.repeatEveryDays}</span>
             </label>
             <input
               id="repeatEveryDays"
               name="repeatEveryDays"
-              type="number"
+              type="range"
               required
               min="1"
               max="10"
+              step="1"
               value={formData.repeatEveryDays}
               onChange={handleNumberChange}
-              className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
-              placeholder="Enter number of posts"
+              className="w-full h-3 bg-purple-100 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-purple-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-black [&::-webkit-slider-thumb]:cursor-pointer"
             />
           </div>
         </div>
