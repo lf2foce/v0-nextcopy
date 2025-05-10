@@ -121,8 +121,8 @@ export default function Sidebar() {
           </div>
         </div>
 
-        {/* Bottom controls */}
-        <div className="border-t border-gray-200 p-4">
+        {/* Bottom controls - fixed at the bottom */}
+        <div className="sticky bottom-0 border-t border-gray-200 p-4 bg-white z-10">
           <div className="flex items-center justify-between space-x-2">
             <SignedIn>
               <CreditsDisplay />
