@@ -501,7 +501,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block font-bold mb-1" htmlFor="repeatEveryDays">
-              Number of Posts to Generate: <span className="text-green-400 font-black">{formData.repeatEveryDays}</span>
+              Number of Posts to Generate: <span className="text-green-500 font-black">{formData.repeatEveryDays}</span>
             </label>
             <input
               id="repeatEveryDays"
@@ -513,7 +513,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
               step="1"
               value={formData.repeatEveryDays}
               onChange={handleNumberChange}
-              className="w-full h-3 bg-purple-100 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-purple-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-black [&::-webkit-slider-thumb]:cursor-pointer"
+              className="w-full h-3 bg-purple-200 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-purple-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-black [&::-webkit-slider-thumb]:cursor-pointer"
             />
           </div>
         </div>
@@ -537,7 +537,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full py-3 px-6 bg-yellow-300 border-4 border-black rounded-md font-bold text-lg hover:bg-yellow-400 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:opacity-70"
+          className="w-full py-3 px-6 bg-green-400 border-4 border-black rounded-md font-bold text-lg hover:bg-yellow-400 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:opacity-70"
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center">
