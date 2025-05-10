@@ -29,10 +29,10 @@ export async function createCampaign(campaignData: any) {
 
   try {
     // Validate required fields
-    if (!campaignData.name || !campaignData.description || !campaignData.target) {
+    if (!campaignData.name || !campaignData.description) {
       return {
         success: false,
-        error: "Missing required fields",
+        error: "Missing required fields: name and description are required",
       }
     }
 

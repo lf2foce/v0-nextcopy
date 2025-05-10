@@ -596,7 +596,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
 
                               if (contentPlan && contentPlan.items && Array.isArray(contentPlan.items)) {
                                 return contentPlan.items.map((item, index) => (
-                                  <div key={index} className="border border-gray-200 p-2 rounded-md bg-white">
+                                  <div key={index} className="border border-blue-200 p-2 rounded-md bg-white">
                                     <p className="font-medium text-sm">{item.title}</p>
                                   </div>
                                 ))
