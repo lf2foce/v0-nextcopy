@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Flag, PlusCircle, Menu, X } from "lucide-react"
+import { LayoutDashboard, Flag, PlusCircle, Menu, X, Settings } from "lucide-react" // Thêm icon Settings
 import { useLanguage } from "@/contexts/language-context"
 import { SignedIn } from "@clerk/nextjs"
 import { CreditsDisplay } from "./CreditsDisplay"
@@ -105,6 +105,18 @@ export default function Sidebar() {
 
               {/* Templates and Content links removed */}
 
+              <Link
+                href="/settings"
+                className={`flex items-center w-full py-3 px-4 rounded-md font-medium transition-colors ${
+                  isActive("/settings")
+                    ? "bg-yellow-300 border-2 border-black"
+                    : "hover:bg-gray-100 border-2 border-transparent"
+                }`}
+                onClick={() => isMobile && setIsOpen(false)}
+              >
+                <Settings className="mr-2" size={20} /> 
+                <span>{translations.settings || 'Cài đặt'}</span> {/* Thêm fallback cho settings */} 
+              </Link>
              
             </nav>
 

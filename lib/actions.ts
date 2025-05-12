@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache"
 import { desc } from "drizzle-orm" // Add this import for getAllCampaigns
 import { getCampaignSteps } from "./campaign-steps" // Import campaign steps
 import { getOrCreateUser } from "./user-actions"
+import { users } from "./schema"; // Thêm import cho bảng users
 
 // Define campaign steps
 const CAMPAIGN_STEPS = {
@@ -316,6 +317,66 @@ export async function getCampaign(campaignId: number) {
   }
 }
 
+// Hàm lấy cài đặt người dùng
+export async function getUserPreferences() {
+  try {
+    const userResult = await getOrCreateUser();
+    if (!userResult.success || !userResult.data) {
+      return { success: false, error: "Unauthorized: Missing user ID." };
+    }
+    const userId = userResult.data.id;
+
+    const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+
+    if (!user || user.length === 0) {
+      return { success: false, error: "User not found." };
+    }
+
+    // Giả sử preferences là một đối tượng JSON hoặc null
+    const preferences = user[0].preferences || {}; 
+    return { success: true, data: preferences };
+
+  } catch (error) {
+    console.error("Failed to get user preferences:", error);
+    return {
+      success: false,
+      error: "Failed to get user preferences: " + (error instanceof Error ? error.message : String(error)),
+    };
+  }
+}
+
+// Hàm cập nhật cài đặt người dùng
+export async function updateUserPreferences(newPreferences: any) {
+  try {
+    const userResult = await getOrCreateUser();
+    if (!userResult.success || !userResult.data) {
+      return { success: false, error: "Unauthorized: Missing user ID." };
+    }
+    const userId = userResult.data.id;
+
+    // Lấy preferences hiện tại
+    const currentUser = await db.select({ preferences: users.preferences }).from(users).where(eq(users.id, userId)).limit(1);
+    const existingPreferences = currentUser[0]?.preferences || {};
+
+    // Merge preferences mới vào preferences hiện tại
+    const updatedPreferencesData = { ...existingPreferences, ...newPreferences };
+
+    await db.update(users)
+      .set({ preferences: updatedPreferencesData })
+      .where(eq(users.id, userId));
+
+    revalidatePath("/settings"); // Hoặc bất kỳ path nào cần revalidate
+    return { success: true, data: updatedPreferencesData };
+
+  } catch (error) {
+    console.error("Failed to update user preferences:", error);
+    return {
+      success: false,
+      error: "Failed to update user preferences: " + (error instanceof Error ? error.message : String(error)),
+    };
+  }
+}
+
 // Toggle campaign active status
 export async function toggleCampaignActiveStatus(campaignId: number, isActive: boolean) {
   try {
@@ -477,6 +538,24 @@ export async function generateSystemPrompt(campaignInput: any) {
       console.error("❌ Missing required campaign fields:", campaignInput)
       return { success: false, error: "Missing required fields", details: campaignInput }
     }
+
+    // Lấy access token và system prompt từ preferences của user
+    const prefsResult = await getUserPreferences();
+    let userAccessToken = process.env.OPENAI_API_KEY; // Fallback to env variable
+    let userSystemPrompt = ""; // Default system prompt
+
+    if (prefsResult.success && prefsResult.data) {
+      if (prefsResult.data.openaiAccessToken) {
+        userAccessToken = prefsResult.data.openaiAccessToken;
+      }
+      if (prefsResult.data.systemPrompt) {
+        userSystemPrompt = prefsResult.data.systemPrompt;
+      }
+    }
+    
+    // Ghi log access token để debug, XÓA SAU KHI DEBUG XONG
+    // console.log("🔑 Using OpenAI Access Token (first 5 chars):", userAccessToken ? userAccessToken.substring(0, 5) : "Not set");
+    // console.log("📝 Using System Prompt:", userSystemPrompt);
 
     const apiUrl = `${getBaseUrl()}/api/campaigns/generate-system-prompt`
     console.log("🌐 Calling internal API:", apiUrl)
