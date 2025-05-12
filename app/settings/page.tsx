@@ -14,7 +14,10 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
     openaiAccessToken: '',
-    systemPrompt: ''
+    systemPrompt: '',
+    facebookPageAccessToken: '',
+    facebookPageId: '',
+    tiktokAccessToken: ''
   })
 
   useEffect(() => {
@@ -24,7 +27,10 @@ export default function SettingsPage() {
         if (result.success && result.data) {
           setFormData({
             openaiAccessToken: result.data.openaiAccessToken || '',
-            systemPrompt: result.data.systemPrompt || ''
+            systemPrompt: result.data.systemPrompt || '',
+            facebookPageAccessToken: result.data.facebookPageAccessToken || '',
+            facebookPageId: result.data.facebookPageId || '',
+            tiktokAccessToken: result.data.tiktokAccessToken || ''
           })
         } else {
           toast({
@@ -113,6 +119,48 @@ export default function SettingsPage() {
             />
             <p className="mt-2 text-sm text-gray-600">Prompt này sẽ được sử dụng làm cơ sở cho việc tạo nội dung (nếu không có prompt cụ thể hơn).</p>
           </label>
+
+          <div className="mt-8 border-t-4 border-black pt-8">
+            <h2 className="text-2xl font-bold mb-4">Cài đặt Social Media</h2>
+            
+            <div className="space-y-4">
+              <label className="block">
+                <span className="text-lg font-bold">Facebook Page Access Token</span>
+                <Input
+                  type="password"
+                  value={formData.facebookPageAccessToken}
+                  onChange={(e) => setFormData(prev => ({ ...prev, facebookPageAccessToken: e.target.value }))}
+                  placeholder="EAAxxxx..."
+                  className="mt-2 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                />
+                <p className="mt-2 text-sm text-gray-600">Token truy cập cho Facebook Page của bạn.</p>
+              </label>
+
+              <label className="block">
+                <span className="text-lg font-bold">Facebook Page ID</span>
+                <Input
+                  type="text"
+                  value={formData.facebookPageId}
+                  onChange={(e) => setFormData(prev => ({ ...prev, facebookPageId: e.target.value }))}
+                  placeholder="123456789..."
+                  className="mt-2 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                />
+                <p className="mt-2 text-sm text-gray-600">ID của Facebook Page bạn muốn đăng bài.</p>
+              </label>
+
+              <label className="block">
+                <span className="text-lg font-bold">TikTok Access Token</span>
+                <Input
+                  type="password"
+                  value={formData.tiktokAccessToken}
+                  onChange={(e) => setFormData(prev => ({ ...prev, tiktokAccessToken: e.target.value }))}
+                  placeholder="ttxx..."
+                  className="mt-2 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                />
+                <p className="mt-2 text-sm text-gray-600">Token truy cập cho tài khoản TikTok của bạn.</p>
+              </label>
+            </div>
+          </div>
         </div>
 
         <Button
