@@ -15,6 +15,8 @@ import {
 } from "@/lib/actions_api"
 import PostImageCard from "@/components/post-image-card"
 import { generatePlaceholderImages, getSelectedImagesCount, isValidImageUrl } from "@/lib/image-generation-utils"
+import { UploadButton } from "@/lib/uploadthing";
+
 
 interface GenerateMultipleImagesProps {
   posts: Post[]
@@ -638,6 +640,18 @@ export default function GenerateMultipleImages({
       <div>
         <h2 className="text-2xl font-black mb-2">Generate Images</h2>
         <p className="text-gray-700">Generate and select images for your posts</p>
+        {/* <UploadButton
+        endpoint="imageUploader"
+        onClientUploadComplete={(res) => {
+          // Do something with the response
+          console.log("Files: ", res);
+          alert("Upload Completed");
+        }}
+        onUploadError={(error: Error) => {
+          // Do something with the error.
+          alert(`ERROR! ${error.message}`);
+        }}
+      /> */}
       </div>
 
       <div className="flex justify-between items-center">
