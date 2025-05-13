@@ -611,7 +611,7 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
                       <textarea
                         value={editContent}
                         onChange={(e) => setEditContent(e.target.value)}
-                        className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400 min-h-[150px]"
+                        className="w-full p-3 border-4 border-black rounded-md focus:outline-hidden focus:ring-2 focus:ring-yellow-400 min-h-[150px]"
                         placeholder="Enter post content"
                       />
                       <div className="flex gap-2">
@@ -702,7 +702,7 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
                               >
                                 {image.isSelected && <Check size={16} />}
                               </div>
-                              <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                              <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
                                 Style: {image.metadata?.style || "default"}
                               </div>
                             </div>

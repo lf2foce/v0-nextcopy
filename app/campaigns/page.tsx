@@ -138,7 +138,7 @@ export default function CampaignsPage() {
         </div>
       ) : error ? (
         <div className="bg-red-100 border-4 border-black rounded-lg p-6 flex items-center gap-4">
-          <AlertCircle className="text-red-500 flex-shrink-0" size={24} />
+          <AlertCircle className="text-red-500 shrink-0" size={24} />
           <div>
             <h3 className="font-bold text-lg">Error loading campaigns</h3>
             <p className="break-words">{error}</p>
@@ -187,7 +187,7 @@ export default function CampaignsPage() {
               >
                 <div className="flex justify-between items-start p-4">
                   <h3 className="text-lg sm:text-xl font-bold break-words pr-2">{campaign.name || campaign.title}</h3>
-                  <span className="py-1 px-3 border-2 border-black rounded-md text-xs sm:text-sm font-medium flex-shrink-0 flex items-center">
+                  <span className="py-1 px-3 border-2 border-black rounded-md text-xs sm:text-sm font-medium shrink-0 flex items-center">
                     {statusIcon}
                     {statusLabel}
                   </span>
@@ -199,7 +199,7 @@ export default function CampaignsPage() {
                   {isDraft && (
                     <div className="bg-yellow-200 border-2 border-black rounded-md p-3 mb-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full bg-black flex-shrink-0"></div>
+                        <div className="w-4 h-4 rounded-full bg-black shrink-0"></div>
                         <span className="font-medium text-sm">
                           {campaign.currentStep && campaign.currentStep > 0
                             ? `Setup incomplete (Step ${campaign.currentStep} of 7)`
@@ -212,7 +212,7 @@ export default function CampaignsPage() {
                   {isPaused && (
                     <div className="bg-red-200 border-2 border-black rounded-md p-3 mb-4">
                       <div className="flex items-center gap-2">
-                        <PauseCircle size={16} className="flex-shrink-0" />
+                        <PauseCircle size={16} className="shrink-0" />
                         <span className="font-medium text-sm">Campaign is currently paused</span>
                       </div>
                     </div>
@@ -220,12 +220,12 @@ export default function CampaignsPage() {
 
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center gap-2">
-                      <Repeat size={16} className="flex-shrink-0" />
+                      <Repeat size={16} className="shrink-0" />
                       <span className="text-sm">Everyday for {campaign.repeatEveryDays} days</span>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Calendar size={16} className="flex-shrink-0" />
+                      <Calendar size={16} className="shrink-0" />
                       <span className="text-sm">
                         Starts:{" "}
                         {campaign.startDate instanceof Date
@@ -238,7 +238,7 @@ export default function CampaignsPage() {
 
                     {campaign.target || campaign.targetCustomer ? (
                       <div className="flex items-center gap-2">
-                        <Instagram size={16} className="flex-shrink-0" />
+                        <Instagram size={16} className="shrink-0" />
                         <span className="text-sm">{campaign.target || campaign.targetCustomer}</span>
                       </div>
                     ) : null}
@@ -249,7 +249,7 @@ export default function CampaignsPage() {
                       href={`/campaigns/${campaign.id}`}
                       className="flex-1 flex items-center justify-center gap-1 py-2 px-2 sm:px-4 bg-blue-300 border-2 border-black rounded-md font-medium hover:bg-blue-400 text-sm"
                     >
-                      <Eye size={16} className="flex-shrink-0" />
+                      <Eye size={16} className="shrink-0" />
                       <span>View Details</span>
                     </Link>
 
@@ -266,7 +266,7 @@ export default function CampaignsPage() {
                           }
                         }}
                       >
-                        <ArrowRight size={16} className="flex-shrink-0" />
+                        <ArrowRight size={16} className="shrink-0" />
                         <span>Continue Setup</span>
                       </Link>
                     )}

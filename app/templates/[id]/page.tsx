@@ -50,7 +50,7 @@ export default async function TemplateDetailPage({
         {/* Header with image and overlay */}
         <div className="h-64 relative">
           <Image src={template.image || "/placeholder.svg"} alt={template.name} fill className="object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+          <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent"></div>
           <div className="absolute bottom-6 left-6 right-6">
             <div className="flex justify-between items-end">
               <h1 className="text-4xl font-black text-white drop-shadow-md">{template.name}</h1>
@@ -103,7 +103,7 @@ export default async function TemplateDetailPage({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div className="space-y-4">
               <div className="flex items-start gap-2">
-                <Target size={20} className="flex-shrink-0 mt-1" />
+                <Target size={20} className="shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold">Đối tượng mục tiêu</h3>
                   <p>{template.targetAudience}</p>
@@ -111,7 +111,7 @@ export default async function TemplateDetailPage({
               </div>
 
               <div className="flex items-start gap-2">
-                <BarChart size={20} className="flex-shrink-0 mt-1" />
+                <BarChart size={20} className="shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold">Mục tiêu marketing</h3>
                   <ul className="list-disc pl-5 mt-1">
@@ -125,7 +125,7 @@ export default async function TemplateDetailPage({
 
             <div className="space-y-4">
               <div className="flex items-start gap-2">
-                <MessageSquare size={20} className="flex-shrink-0 mt-1" />
+                <MessageSquare size={20} className="shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold">Nội dung mẫu</h3>
                   <p>{template.sampleContent}</p>
@@ -133,7 +133,7 @@ export default async function TemplateDetailPage({
               </div>
 
               <div className="flex items-start gap-2">
-                <Calendar size={20} className="flex-shrink-0 mt-1" />
+                <Calendar size={20} className="shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold">Lịch sử sử dụng</h3>
                   <p>Đã được sử dụng {template.usageCount} lần</p>

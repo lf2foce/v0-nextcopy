@@ -101,22 +101,22 @@ export default function ContentPage() {
 
                 <div className="flex flex-wrap gap-4 text-sm">
                   <div className="flex items-center gap-1">
-                    <Instagram size={16} className="flex-shrink-0" />
+                    <Instagram size={16} className="shrink-0" />
                     <span>{post.platform}</span>
                   </div>
 
                   <div className="flex items-center gap-1">
-                    <Calendar size={16} className="flex-shrink-0" />
+                    <Calendar size={16} className="shrink-0" />
                     <span>{post.scheduledDate}</span>
                   </div>
 
                   <div className="flex items-center gap-1">
-                    <ThumbsUp size={16} className="flex-shrink-0" />
+                    <ThumbsUp size={16} className="shrink-0" />
                     <span>{post.likes} likes</span>
                   </div>
 
                   <div className="flex items-center gap-1">
-                    <FileText size={16} className="flex-shrink-0" />
+                    <FileText size={16} className="shrink-0" />
                     <span>Post #{post.id}</span>
                   </div>
                 </div>

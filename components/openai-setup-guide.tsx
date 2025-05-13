@@ -1,6 +1,6 @@
 export function OpenAISetupGuide() {
   return (
-    <div className="p-6 border-4 border-black rounded-md bg-gradient-to-r from-purple-100 to-pink-100">
+    <div className="p-6 border-4 border-black rounded-md bg-linear-to-r from-purple-100 to-pink-100">
       <h2 className="text-2xl font-black mb-4">OpenAI API Key Setup</h2>
 
       <div className="space-y-4">
@@ -30,7 +30,7 @@ export function OpenAISetupGuide() {
           <li>Create a new secret key</li>
           <li>Copy the key (you'll only see it once!)</li>
           <li>
-            Add it to your <code className="bg-gray-200 px-1 rounded">.env.local</code> file in your project root
+            Add it to your <code className="bg-gray-200 px-1 rounded-sm">.env.local</code> file in your project root
           </li>
           <li>Restart your development server</li>
         </ol>

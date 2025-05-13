@@ -461,7 +461,7 @@ export default function GenerateVideo({ posts, onComplete, onBack, skipIfNoImage
                                 fill
                                 className="object-cover"
                               />
-                              <div className="absolute top-1 left-1 bg-black/70 text-white text-xs px-2 py-0.5 rounded">
+                              <div className="absolute top-1 left-1 bg-black/70 text-white text-xs px-2 py-0.5 rounded-sm">
                                 Style: {image.metadata?.style || "default"}
                               </div>
                             </div>

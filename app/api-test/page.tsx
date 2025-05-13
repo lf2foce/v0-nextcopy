@@ -89,7 +89,7 @@ export default function ApiTestPage() {
               <h3 className="font-bold">Troubleshooting Steps:</h3>
               <ol className="list-decimal pl-5 space-y-2">
                 <li>
-                  Verify that you've added the <code className="bg-gray-100 px-1 py-0.5 rounded">OPENAI_API_KEY</code>{" "}
+                  Verify that you've added the <code className="bg-gray-100 px-1 py-0.5 rounded-sm">OPENAI_API_KEY</code>{" "}
                   to your environment variables.
                 </li>
                 <li>Check that your API key is valid and has not expired.</li>

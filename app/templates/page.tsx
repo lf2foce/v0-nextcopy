@@ -148,7 +148,7 @@ export default function TemplatesPage() {
             {/* Template image with overlay */}
             <div className="h-48 relative">
               <Image src={template.image || "/placeholder.svg"} alt={template.name} fill className="object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+              <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent"></div>
               <div className="absolute bottom-0 left-0 right-0 p-4">
                 <span className="bg-white px-3 py-1 rounded-full border-2 border-black text-sm font-bold">
                   {template.category}
@@ -164,7 +164,7 @@ export default function TemplatesPage() {
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="bg-yellow-100 border-2 border-black rounded-md p-2">
                   <div className="flex items-center gap-1">
-                    <TrendingUp size={14} className="flex-shrink-0" />
+                    <TrendingUp size={14} className="shrink-0" />
                     <span className="text-xs font-medium">Tỷ lệ chuyển đổi</span>
                   </div>
                   <p className="font-bold">{template.conversionRate}</p>
@@ -172,7 +172,7 @@ export default function TemplatesPage() {
 
                 <div className="bg-blue-100 border-2 border-black rounded-md p-2">
                   <div className="flex items-center gap-1">
-                    <Users size={14} className="flex-shrink-0" />
+                    <Users size={14} className="shrink-0" />
                     <span className="text-xs font-medium">Tương tác</span>
                   </div>
                   <p className="font-bold">{template.engagementRate}</p>
@@ -181,12 +181,12 @@ export default function TemplatesPage() {
 
               <div className="space-y-3 mb-4">
                 <div className="flex items-center gap-2">
-                  <Clock size={16} className="flex-shrink-0 text-gray-500" />
+                  <Clock size={16} className="shrink-0 text-gray-500" />
                   <span className="font-medium text-sm">Everyday for {template.duration} days</span>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Calendar size={16} className="flex-shrink-0 text-gray-500" />
+                  <Calendar size={16} className="shrink-0 text-gray-500" />
                   <span className="font-medium text-sm">Đã dùng {template.usageCount} lần</span>
                 </div>
               </div>

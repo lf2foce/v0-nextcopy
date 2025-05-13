@@ -202,7 +202,7 @@ export default function CampaignContentClient({
           <h1 className="text-3xl font-black ml-2">Campaign Content</h1>
         </div>
 
-        <button className="flex items-center gap-2 py-2 px-4 bg-[#22c55e] border-2 border-black rounded-md font-medium hover:bg-[#16a34a] text-white">
+        <button className="flex items-center gap-2 py-2 px-4 bg-green-500 border-2 border-black rounded-md font-medium hover:bg-[#16a34a] text-white">
           <Download size={16} />
           Export Content
         </button>
@@ -213,7 +213,7 @@ export default function CampaignContentClient({
         <p className="text-gray-700 mb-4">{campaign.description}</p>
 
         <div className="flex items-center gap-2">
-          <Users size={16} className="flex-shrink-0" />
+          <Users size={16} className="shrink-0" />
           <span className="font-medium">{campaign.targetCustomer || "Not specified"}</span>
         </div>
       </div>
@@ -279,7 +279,7 @@ export default function CampaignContentClient({
             let statusColor = "bg-gray-200"
 
             if (post.status === "scheduled") {
-              statusColor = "bg-[#22c55e]"
+              statusColor = "bg-green-500"
             } else if (post.status === "posted") {
               statusLabel = "Published"
               statusColor = "bg-[#60a5fa]"
@@ -297,7 +297,7 @@ export default function CampaignContentClient({
                 <div className="flex justify-between items-start p-4 border-b-4 border-black">
                   <h3 className="text-xl font-bold">{post.title || `Post ${index + 1}`}</h3>
                   <span
-                    className={`py-1 px-3 border-2 border-black rounded-md text-sm font-medium ${statusColor} ${statusColor === "bg-[#22c55e]" || statusColor === "bg-[#60a5fa]" ? "text-white" : ""}`}
+                    className={`py-1 px-3 border-2 border-black rounded-md text-sm font-medium ${statusColor} ${statusColor === "bg-green-500" || statusColor === "bg-[#60a5fa]" ? "text-white" : ""}`}
                   >
                     {statusLabel}
                   </span>
@@ -377,7 +377,7 @@ export default function CampaignContentClient({
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     {post.scheduledDate && (
                       <>
-                        <Calendar size={14} className="flex-shrink-0" />
+                        <Calendar size={14} className="shrink-0" />
                         <span>
                           {post.scheduledDate instanceof Date
                             ? post.scheduledDate.toLocaleDateString()

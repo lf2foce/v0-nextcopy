@@ -111,21 +111,21 @@ export default function CampaignDetailClient({ initialCampaign }: { initialCampa
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="flex items-center gap-2">
-                <Clock size={20} className="flex-shrink-0" />
+                <Clock size={20} className="shrink-0" />
                 <div>
                   <span className="font-bold">Duration:</span> Everyday for {campaign.repeatEveryDays} days
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <Users size={20} className="flex-shrink-0" />
+                <Users size={20} className="shrink-0" />
                 <div>
                   <span className="font-bold">Target Customer:</span> {campaign.targetCustomer || "Not specified"}
                 </div>
               </div>
 
               <div className="flex items-center gap-2 md:col-span-2">
-                <Calendar size={20} className="flex-shrink-0" />
+                <Calendar size={20} className="shrink-0" />
                 <div>
                   <span className="font-bold">Timeline:</span> {formatDateRange()}
                 </div>
@@ -136,7 +136,7 @@ export default function CampaignDetailClient({ initialCampaign }: { initialCampa
               onClick={togglePauseStatus}
               disabled={isToggling}
               className={`flex items-center gap-2 py-3 px-6 rounded-md font-bold text-lg border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ${
-                isPaused ? "bg-[#22c55e] hover:bg-[#16a34a]" : "bg-[#FFDD00] hover:bg-[#FFCC00]"
+                isPaused ? "bg-green-500 hover:bg-[#16a34a]" : "bg-[#FFDD00] hover:bg-[#FFCC00]"
               } transition-colors`}
             >
               {isToggling ? (
@@ -301,7 +301,7 @@ export default function CampaignDetailClient({ initialCampaign }: { initialCampa
                 onClick={togglePauseStatus}
                 disabled={isToggling}
                 className={`w-full flex items-center justify-center gap-2 py-3 px-6 rounded-md font-bold text-lg border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ${
-                  isPaused ? "bg-[#22c55e] hover:bg-[#16a34a]" : "bg-[#FFDD00] hover:bg-[#FFCC00]"
+                  isPaused ? "bg-green-500 hover:bg-[#16a34a]" : "bg-[#FFDD00] hover:bg-[#FFCC00]"
                 } transition-colors`}
               >
                 {isToggling ? (

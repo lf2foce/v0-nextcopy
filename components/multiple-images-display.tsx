@@ -134,7 +134,7 @@ export function MultipleImagesDisplay({
               return (
                 <div
                   key={index}
-                  className="relative flex-shrink-0 snap-center cursor-pointer"
+                  className="relative shrink-0 snap-center cursor-pointer"
                   style={{ width: "220px", height: "140px" }}
                   onClick={() => !hasError && onImageClick && onImageClick(index)}
                 >
@@ -146,7 +146,7 @@ export function MultipleImagesDisplay({
                     </div>
                   ) : (
                     <>
-                      <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 text-xs rounded z-10">
+                      <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 text-xs rounded-sm z-10">
                         Style: {image.metadata?.style || "default"}
                       </div>
                       <Image
@@ -199,7 +199,7 @@ export function MultipleImagesDisplay({
                 onError={() => handleImageError(selectedIndex)}
                 unoptimized // Skip optimization to avoid issues with external URLs
               />
-              <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 text-xs rounded">
+              <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 text-xs rounded-sm">
                 Style: {selectedImage.metadata?.style || "default"}
               </div>
             </>

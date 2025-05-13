@@ -364,7 +364,7 @@ export default function PostImageCard({
                         >
                           {image.isSelected && <Check size={16} />}
                         </div>
-                        <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                        <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
                           {image.metadata?.service
                             ? `${image.metadata.service} - ${image.metadata.style || imageStyle}`
                             : `Style: ${image.metadata?.style || imageStyle}`}

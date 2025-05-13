@@ -364,7 +364,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
       {selectedTemplate && (
         <div className="bg-yellow-100 border-4 border-black rounded-md p-4 mb-4">
           <div className="flex items-start gap-2">
-            <AlertCircle size={20} className="text-yellow-600 flex-shrink-0 mt-1" />
+            <AlertCircle size={20} className="text-yellow-600 shrink-0 mt-1" />
             <div>
               <h3 className="font-bold">Template Applied: {selectedTemplate.name}</h3>
               <p className="text-sm">
@@ -378,7 +378,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
       {apiError && (
         <div className="bg-red-100 border-4 border-black rounded-md p-4 mb-4">
           <div className="flex items-start gap-2">
-            <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-1" />
+            <AlertCircle size={20} className="text-red-600 shrink-0 mt-1" />
             <div>
               <h3 className="font-bold">API Error</h3>
               <p className="text-sm">{apiError}</p>
@@ -390,7 +390,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
       {usingFallback && (
         <div className="bg-orange-100 border-4 border-black rounded-md p-4 mb-4">
           <div className="flex items-start gap-2">
-            <AlertCircle size={20} className="text-orange-600 flex-shrink-0 mt-1" />
+            <AlertCircle size={20} className="text-orange-600 shrink-0 mt-1" />
             <div>
               <h3 className="font-bold">Using Fallback Description</h3>
               <p className="text-sm">The AI service is currently unavailable. A fallback description is being used.</p>
@@ -411,7 +411,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
             required
             value={formData.name}
             onChange={handleChange}
-            className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            className="w-full p-3 border-4 border-black rounded-md focus:outline-hidden focus:ring-2 focus:ring-yellow-400"
             placeholder="Summer Sale 2025"
           />
         </div>
@@ -428,14 +428,14 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
               value={formData.description}
               onChange={handleChange}
               rows={6}
-              className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              className="w-full p-3 border-4 border-black rounded-md focus:outline-hidden focus:ring-2 focus:ring-yellow-400"
               placeholder="Describe your campaign goals and objectives"
             />
             <button
               type="button"
               onClick={generateDescription}
               disabled={isGenerating}
-              className="absolute bottom-3 right-6 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 border-2 border-black rounded-md p-2 hover:opacity-90 transition-opacity flex items-center gap-1"
+              className="absolute bottom-3 right-6 bg-linear-to-r from-purple-500 via-pink-500 to-orange-500 border-2 border-black rounded-md p-2 hover:opacity-90 transition-opacity flex items-center gap-1"
               title="Generate description with AI"
             >
               {isGenerating ? (
@@ -458,7 +458,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
             type="text"
             value={formData.target}
             onChange={handleChange}
-            className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            className="w-full p-3 border-4 border-black rounded-md focus:outline-hidden focus:ring-2 focus:ring-yellow-400"
             placeholder="Young adults interested in fashion"
           />
         </div>
@@ -473,7 +473,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
             value={formData.insight || ""}
             onChange={handleChange}
             rows={3}
-            className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            className="w-full p-3 border-4 border-black rounded-md focus:outline-hidden focus:ring-2 focus:ring-yellow-400"
             placeholder="Share deep insights about your target customers' behaviors, motivations, or preferences"
           />
         </div>
@@ -487,7 +487,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
             name="content_type"
             value={formData.content_type}
             onChange={handleChange}
-            className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            className="w-full p-3 border-4 border-black rounded-md focus:outline-hidden focus:ring-2 focus:ring-yellow-400"
           >
             <option value="Auto">Auto - Let the AI choose the best content type based on your description</option>
             <option value="Storytelling">Storytelling - For emotional brand connection, lifestyle vibes</option>
@@ -513,7 +513,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
               step="1"
               value={formData.repeatEveryDays}
               onChange={handleNumberChange}
-              className="w-full h-3 bg-purple-200 rounded-lg appearance-none cursor-pointer range-lg focus:outline-none focus:ring-2 focus:ring-purple-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-black [&::-webkit-slider-thumb]:cursor-pointer"
+              className="w-full h-3 bg-purple-200 rounded-lg appearance-none cursor-pointer range-lg focus:outline-hidden focus:ring-2 focus:ring-purple-400 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-black [&::-webkit-slider-thumb]:cursor-pointer"
             />
           </div>
         </div>
@@ -530,7 +530,7 @@ export default function CreateCampaign({ onSubmit, initialData }: CreateCampaign
             min={today}
             value={formattedStartDate}
             onChange={handleDateChange}
-            className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            className="w-full p-3 border-4 border-black rounded-md focus:outline-hidden focus:ring-2 focus:ring-yellow-400"
           />
         </div>
 

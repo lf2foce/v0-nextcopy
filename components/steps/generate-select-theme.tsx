@@ -665,7 +665,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
                           type="text"
                           value={customThemeTitle}
                           onChange={(e) => setCustomThemeTitle(e.target.value)}
-                          className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                          className="w-full p-3 border-4 border-black rounded-md focus:outline-hidden focus:ring-2 focus:ring-yellow-400"
                           placeholder="Enter your theme title"
                         />
                       </div>
@@ -677,7 +677,7 @@ export default function GenerateSelectTheme({ campaign, onThemeSelected, onBack 
                           id="customThemeDescription"
                           value={customThemeDescription}
                           onChange={(e) => setCustomThemeDescription(e.target.value)}
-                          className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400 min-h-[100px]"
+                          className="w-full p-3 border-4 border-black rounded-md focus:outline-hidden focus:ring-2 focus:ring-yellow-400 min-h-[100px]"
                           placeholder="Describe your theme"
                         />
                       </div>

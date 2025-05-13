@@ -153,7 +153,7 @@ export default function ImageViewerModal({ images, initialIndex = 0, isOpen, onC
               {/* Header */}
               <div>
                 <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-xl font-bold bg-yellow-100 px-2 py-1 rounded">
+                  <h3 className="text-xl font-bold bg-yellow-100 px-2 py-1 rounded-sm">
                     Image {currentIndex + 1} of {images.length}
                     {currentImage.metadata?.style && ` - Style: ${currentImage.metadata.style}`}
                   </h3>
@@ -197,7 +197,7 @@ export default function ImageViewerModal({ images, initialIndex = 0, isOpen, onC
                       <button
                         key={index}
                         onClick={() => setCurrentIndex(index)}
-                        className={`relative w-16 h-16 flex-shrink-0 border-2 ${
+                        className={`relative w-16 h-16 shrink-0 border-2 ${
                           index === currentIndex ? "border-yellow-400" : "border-black"
                         } rounded-md overflow-hidden`}
                       >

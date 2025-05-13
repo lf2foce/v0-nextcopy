@@ -186,7 +186,7 @@ export default function AdminPage() {
                 type="password"
                 value={adminToken}
                 onChange={(e) => setAdminToken(e.target.value)}
-                className="w-full p-3 border-4 border-black rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                className="w-full p-3 border-4 border-black rounded-md focus:outline-hidden focus:ring-2 focus:ring-yellow-400"
                 placeholder="Enter your admin token"
               />
             </div>
