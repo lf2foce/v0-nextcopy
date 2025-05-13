@@ -61,7 +61,9 @@ export default function GenerateMultipleImages({
       return;
     }
 
-    setLocalPosts(prevPosts => {
+    // Process the update in a useEffect-like manner
+    const processUpload = async () => {
+      const updatedPosts = (prevPosts: Post[]) => {
         return prevPosts.map(p => {
             if (p.id === postId) {
                 let existingImages: any[] = [];
@@ -112,8 +114,14 @@ export default function GenerateMultipleImages({
             }
             return p;
         });
-    });
-  }, [toast]); // localPosts dependency might cause re-runs, consider refining if issues arise
+      };
+
+      setLocalPosts(updatedPosts);
+    };
+
+    // Queue the state update
+    setTimeout(processUpload, 0);
+  }, [toast]);
 
   // Check if any posts are being processed
   const isProcessingAny = Object.values(processingPosts).some(Boolean)

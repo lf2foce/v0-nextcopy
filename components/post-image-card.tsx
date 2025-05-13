@@ -252,28 +252,7 @@ export default function PostImageCard({
               )}
             </div>
 
-            {/* Upload Button */}
-            <UploadButton
-              endpoint="imageUploader" // Adjust endpoint as needed
-              onClientUploadComplete={(res) => {
-                if (res && res.length > 0) {
-                  const urls = res.map(file => file.url);
-                  onImageUpload(post.id, urls);
-                }
-              }}
-              onUploadError={(error: Error) => {
-                // Do something with the error.
-                alert(`ERROR! ${error.message}`);
-              }}
-              className={`py-1 px-3 bg-blue-500 hover:bg-blue-600 text-white border-2 border-black rounded-md 
-                flex items-center gap-1 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed 
-                shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] 
-                transition-all duration-150 ${isMobile ? "w-full justify-center mt-2" : ""}`}
-              disabled={isProcessing || isSubmitting}
-            >
-              <UploadCloud size={16} />
-              Upload
-            </UploadButton>
+            
 
             {/* Regenerate button - full width on mobile */}
             <button
@@ -294,6 +273,42 @@ export default function PostImageCard({
                 </>
               )}
             </button>
+
+            {/* Upload Button */}
+            <UploadButton
+  endpoint="imageUploader"
+  content={{
+    button({ isUploading }) {
+      return (
+        <div className="flex items-center gap-1">
+          {isUploading ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <UploadCloud size={14} />
+          )}
+          {isUploading ? "Uploading..." : "Upload Images"}
+        </div>
+      );
+    },
+    allowedContent: ""
+  }}
+  appearance={{
+    button: "rounded-md text-sm flex items-center justify-center",
+    container: "w-auto",
+    allowedContent: "hidden"
+  }}
+  onClientUploadComplete={(res) => {
+    if (res && res.length > 0) {
+      const urls = res.map(file => file.ufsUrl);
+      onImageUpload(post.id, urls);
+    }
+  }}
+  onUploadError={(error: Error) => {
+    alert(`ERROR! ${error.message}`);
+  }}
+  className={`py-1 px-3 ${isMobile ? "w-full mt-2" : ""}`}
+  disabled={isProcessing || isSubmitting}
+/>
           </div>
         </div>
 
