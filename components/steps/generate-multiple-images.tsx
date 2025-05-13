@@ -1,5 +1,8 @@
 "use client"
 
+const MAX_POLL_ATTEMPTS = 20 // Example value, adjust as needed
+const POLL_INTERVAL = 5000 // Example value in ms (5 seconds), adjust as needed
+
 import { useState, useEffect, useCallback } from "react"
 import type { Post } from "../campaign-workflow"
 import { CheckCircle, RefreshCw, Loader2 } from "lucide-react"
@@ -28,7 +31,6 @@ export default function GenerateMultipleImages({
 }: GenerateMultipleImagesProps) {
   // Core state
   const [localPosts, setLocalPosts] = useState<Post[]>([])
-  const [refreshKey, setRefreshKey] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [processingPosts, setProcessingPosts] = useState<Record<string | number, boolean>>({})
   const [errorMessages, setErrorMessages] = useState<Record<string | number, string>>({})
@@ -93,11 +95,6 @@ export default function GenerateMultipleImages({
     })
     setSettings(initialSettings)
   }, [posts, hasRealImages])
-
-  // Force UI refresh
-  const forceRefresh = useCallback(() => {
-    setRefreshKey((prev) => prev + 1)
-  }, [])
 
   // Check image status and update if needed
   const checkImageStatus = useCallback(async (postId: number) => {
@@ -234,83 +231,39 @@ export default function GenerateMultipleImages({
     [processingPosts, settings, toast, checkImageStatus],
   )
 
-  // Poll for image status with attempt counter and better state management
+  // Poll for image status
   const pollImageStatus = useCallback(
-    async (postId: number, attempts = 0) => {
-      // Skip if not processing
-      if (!processingPosts[postId]) return
+    async (postId: number, attempt = 1) => {
+      // Max attempts
+      if (attempt > MAX_POLL_ATTEMPTS) {
+        setErrorMessages((prev) => ({
+          ...prev,
+          [postId]: `Polling timed out after ${MAX_POLL_ATTEMPTS} attempts. Please try regenerating. Status: ${localPosts.find(p => p.id === postId)?.image_status}`,
+        }))
+        setProcessingPosts((prev) => ({ ...prev, [postId]: false }))
+        setLocalPosts((posts) =>
+          posts.map((p) => (p.id === postId ? { ...p, image_status: "failed" } : p)),
+        )
+        return
+      }
 
-      console.log(`Polling image status for post ${postId}, attempt ${attempts}`)
+      // Check status
+      const isCompleted = await checkImageStatus(postId)
 
-      try {
-        // Check status from the database
-        const result = await checkImageGenerationStatus(postId)
-
-        if (result.success) {
-          // If we have images, update the UI
-          if (result.data.hasImages) {
-            // Update local state with the images
-            setLocalPosts((posts) =>
-              posts.map((post) =>
-                post.id === postId
-                  ? {
-                      ...post,
-                      images: JSON.stringify({ images: result.data.images }),
-                      imageUrl: result.data.images[0]?.url || post.imageUrl,
-                      image_status: "completed",
-                    }
-                  : post,
-              ),
-            )
-
-            // Clear processing state
-            setProcessingPosts((prev) => ({ ...prev, [postId]: false }))
-            setErrorMessages((prev) => {
-              const next = { ...prev }
-              delete next[postId]
-              return next
-            })
-
-            // Force refresh
-            forceRefresh()
-            return
-          }
-
-          // If status is completed but no images yet, keep polling
-          if (result.data.status === "completed" && !result.data.hasImages) {
-            // Try again after a short delay
-            setTimeout(() => {
-              pollImageStatus(postId, attempts + 1)
-            }, 3000)
-            return
-          }
-        }
-
-        // Max 30 attempts (about 2.5 minutes)
-        if (attempts >= 30) {
-          console.log(`Polling timed out for post ${postId} after ${attempts} attempts`)
-          // Stop polling after max attempts
-          setProcessingPosts((prev) => ({ ...prev, [postId]: false }))
-          setErrorMessages((prev) => ({
-            ...prev,
-            [postId]: "Timed out waiting for images. Try refreshing.",
-          }))
-          return
-        }
-
-        // Continue polling with increased attempt count
-        setTimeout(() => {
-          pollImageStatus(postId, attempts + 1)
-        }, 5000)
-      } catch (error) {
-        console.error(`Error in polling for post ${postId}:`, error)
-        // On error, continue polling but with a shorter interval
-        setTimeout(() => {
-          pollImageStatus(postId, attempts + 1)
-        }, 3000)
+      if (isCompleted) {
+        // If completed, stop polling
+        setProcessingPosts((prev) => ({ ...prev, [postId]: false }))
+        setErrorMessages((prev) => {
+          const next = { ...prev }
+          delete next[postId]
+          return next
+        })
+      } else {
+        // If not completed, poll again after a delay
+        setTimeout(() => pollImageStatus(postId, attempt + 1), POLL_INTERVAL)
       }
     },
-    [processingPosts, checkImageGenerationStatus, setLocalPosts, setProcessingPosts, setErrorMessages, forceRefresh],
+    [checkImageStatus, localPosts], // Removed forceRefresh
   )
 
   // Periodically check for images for all posts that are generating
@@ -329,7 +282,7 @@ export default function GenerateMultipleImages({
           checkImageStatus(post.id).then((updated) => {
             if (updated) {
               // Force refresh if any post was updated
-              forceRefresh()
+              // forceRefresh() // Removed
             }
           })
         }
@@ -337,122 +290,157 @@ export default function GenerateMultipleImages({
     }, 10000) // Check every 10 seconds
 
     return () => clearInterval(interval)
-  }, [localPosts, processingPosts, isProcessingAny, checkImageStatus, forceRefresh])
+  }, [localPosts, processingPosts, isProcessingAny, checkImageStatus])
 
   // Regenerate images
   const handleRegenerateImages = useCallback(
     async (postId: number) => {
-      // Clear existing images
+      // Immediate UI feedback
       const placeholderImages = generatePlaceholderImages(postId)
-
-      // Update local state
+      
+      // Update UI state immediately
       setLocalPosts((posts) =>
         posts.map((post) =>
           post.id === postId
             ? {
                 ...post,
                 images: JSON.stringify({ images: placeholderImages }),
-                image_status: "pending",
+                image_status: "generating", // Changed from "pending" to "generating"
               }
             : post,
-        ),
+        )
       )
-
-      // Clear in database
-      await clearPostImages(postId, placeholderImages)
-
-      // Generate new images
-      await generateImages(postId)
+      
+      // Set processing state immediately
+      setProcessingPosts((prev) => ({ ...prev, [postId]: true }))
+      
+      // Clear error messages immediately
+      setErrorMessages((prev) => {
+        const next = { ...prev }
+        delete next[postId]
+        return next
+      })
+  
+      // Show immediate feedback toast
+      toast({
+        title: "Regenerating Images",
+        description: "Starting image regeneration process...",
+      })
+  
+      // Background tasks
+      try {
+        // Clear in database (non-blocking)
+        clearPostImages(postId, placeholderImages).catch(console.error)
+        
+        // Generate new images
+        await generateImages(postId)
+      } catch (error) {
+        console.error(`Error regenerating images for post ${postId}:`, error)
+        // Error handling is already done in generateImages
+      }
     },
-    [generateImages],
+    [generateImages, toast],
   )
 
   // Generate all images
   const handleGenerateAllImages = useCallback(async () => {
-    setIsSubmitting(true)
+    setIsSubmitting(true);
+
+    let postsToProcessGlobal: Post[] = []; // To use in finally/catch block if needed
 
     try {
-      // Reset errors
-      setErrorMessages({})
-
-      // Get posts to process
-      const postsToProcess = localPosts.filter((post) => !processingPosts[post.id])
+      setErrorMessages({});
+      const postsToProcess = localPosts.filter((post) => !processingPosts[post.id]);
+      postsToProcessGlobal = postsToProcess; // Assign for potential use in error handling
 
       if (postsToProcess.length === 0) {
         toast({
           title: "No posts to process",
           description: "All posts are already being processed.",
-        })
-        setIsSubmitting(false)
-        return
+        });
+        setIsSubmitting(false);
+        return;
       }
 
-      // Reset all posts with placeholders
-      const updatedPosts = [...localPosts]
-      const newProcessing = { ...processingPosts }
+      // Stage 1: Immediate UI update to show "generating" state for all selected posts
+      const updatedProcessingState = { ...processingPosts };
+      const postsWithImmediateStatusUpdate = localPosts.map(p => {
+        const isTargetPost = postsToProcess.find(ptp => ptp.id === p.id);
+        if (isTargetPost) {
+          if (typeof p.id === 'number') {
+            updatedProcessingState[p.id] = true;
+          }
+          return { ...p, image_status: "generating" }; // Set to "generating" for immediate feedback
+        }
+        return p;
+      });
 
+      setLocalPosts(postsWithImmediateStatusUpdate);
+      setProcessingPosts(updatedProcessingState);
+
+      // Stage 2: Background processing (clear existing images in DB and update local image placeholders)
+      // This loop contains awaits, so it runs after the immediate UI update.
       for (const post of postsToProcess) {
         if (typeof post.id === "number") {
-          const placeholderImages = generatePlaceholderImages(post.id)
-
-          // Update local post
-          const index = updatedPosts.findIndex((p) => p.id === post.id)
-          if (index >= 0) {
-            updatedPosts[index] = {
-              ...updatedPosts[index],
-              images: JSON.stringify({ images: placeholderImages }),
-              image_status: "pending",
-            }
-          }
-
-          // Clear in database
-          await clearPostImages(post.id, placeholderImages)
-
-          // Mark as processing
-          newProcessing[post.id] = true
+          const placeholderImages = generatePlaceholderImages(post.id);
+          // Update local post's images to placeholders (this will be a quick follow-up UI update for each post)
+          setLocalPosts(prevPosts =>
+            prevPosts.map(p =>
+              p.id === post.id
+                ? { ...p, images: JSON.stringify({ images: placeholderImages }) }
+                : p
+            )
+          );
+          await clearPostImages(post.id, placeholderImages); // DB operation
         }
       }
 
-      // Update state
-      setLocalPosts(updatedPosts)
-      setProcessingPosts(newProcessing)
-
-      // Process in batches
-      const batchSize = 2
-
+      // Stage 3: Process in batches (actual image generation calls)
+      const batchSize = 2; // Consider making this configurable or dynamic
       for (let i = 0; i < postsToProcess.length; i += batchSize) {
-        const batch = postsToProcess.slice(i, i + batchSize)
-
-        // Process batch
+        const batch = postsToProcess.slice(i, i + batchSize);
         await Promise.all(
           batch.map((post) => {
             if (typeof post.id === "number") {
-              return generateImages(post.id)
+              // generateImages will handle its own processing state and image_status updates
+              return generateImages(post.id);
             }
-            return Promise.resolve()
-          }),
-        )
+            return Promise.resolve();
+          })
+        );
 
-        // Add delay between batches
         if (i + batchSize < postsToProcess.length) {
-          await new Promise((resolve) => setTimeout(resolve, 1000))
+          await new Promise((resolve) => setTimeout(resolve, 1000)); // Delay between batches
         }
       }
 
       toast({
-        title: "Generating images",
-        description: `Started image generation for ${postsToProcess.length} posts.`,
-      })
+        title: "Image Generation Started",
+        description: `Image generation process initiated for ${postsToProcess.length} posts.`,
+      });
+
     } catch (error) {
-      console.error("Error generating all images:", error)
+      console.error("Error in handleGenerateAllImages:", error);
       toast({
-        title: "Error",
-        description: "Failed to generate all images",
-      })
+        title: "Error Generating Images",
+        description: "An unexpected error occurred while trying to generate all images. Please check the console for more details.",
+        variant: "destructive",
+      });
+      // Attempt to revert UI state for posts that were marked as processing by this function
+      setLocalPosts(prevPosts =>
+        prevPosts.map(p => {
+          if (postsToProcessGlobal.find(ptp => ptp.id === p.id) && p.image_status === "generating") {
+            return { ...p, image_status: "pending" }; // Revert to "pending"
+          }
+          return p;
+        })
+      );
+      // More sophisticated error handling for processingPosts might be needed
+      // For now, we rely on individual generateImages calls to clear their processing flags on error/completion
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }, [localPosts, processingPosts, toast, generateImages])
+  }, [localPosts, processingPosts, toast, generateImages]);
 
   // Manual refresh - check all posts
   const manualRefreshUI = useCallback(async () => {
@@ -495,8 +483,8 @@ export default function GenerateMultipleImages({
       description: updatedCount > 0 ? `Updated ${updatedCount} posts with new images.` : "No new images found.",
     })
 
-    forceRefresh()
-  }, [localPosts, processingPosts, toast, checkImageStatus, hasRealImages, forceRefresh])
+    // forceRefresh() // Removed
+  }, [localPosts, processingPosts, toast, checkImageStatus, hasRealImages])
 
   // Toggle image selection
   const toggleImageSelection = useCallback(async (postId: number, imageIndex: number) => {
@@ -716,7 +704,7 @@ export default function GenerateMultipleImages({
       <div className="space-y-6">
         {localPosts.map((post, index) => (
           <PostImageCard
-            key={`${post.id}-${refreshKey}`}
+            key={`${post.id}`}
             post={post}
             index={index}
             isGenerating={post.image_status === "generating" || processingPosts[post.id]}
