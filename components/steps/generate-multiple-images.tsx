@@ -42,6 +42,79 @@ export default function GenerateMultipleImages({
 
   const { toast } = useToast()
 
+  // Handler for when an image is uploaded via PostImageCard
+  const handleImageUpload = useCallback(async (postId: string | number, uploadedImageUrls: string[]) => {
+    if (typeof postId !== 'number') {
+      toast({
+        title: "Error",
+        description: "Cannot upload image for a post without a valid ID.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!uploadedImageUrls || uploadedImageUrls.length === 0) {
+      toast({
+        title: "Upload Issue",
+        description: "No image URLs received from upload.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLocalPosts(prevPosts => {
+        return prevPosts.map(p => {
+            if (p.id === postId) {
+                let existingImages: any[] = [];
+                try {
+                    const imagesString = typeof p.images === 'string' ? p.images : '{"images":[]}';
+                    const imagesData = JSON.parse(imagesString);
+                    existingImages = imagesData.images || [];
+                } catch (e) {
+                    console.error("Error parsing existing images JSON for save:", e);
+                    existingImages = [];
+                }
+
+                const newImagesData = uploadedImageUrls.map((url, index) => ({
+                    url: url,
+                    isSelected: true,
+                    prompt: "Uploaded image",
+                    order: existingImages.length + index,
+                    metadata: { service: "upload", style: "uploaded" },
+                }));
+
+                const allImages = [...existingImages, ...newImagesData];
+                const selectedImage = allImages.find(img => img.isSelected);
+                const newMainImageUrl = selectedImage ? selectedImage.url : (allImages.length > 0 ? allImages[0].url : p.imageUrl);
+                const imagesJsonToSave = JSON.stringify({ images: allImages });
+
+                saveImageSelection(postId as number, imagesJsonToSave, newMainImageUrl)
+                    .then(() => {
+                        toast({
+                            title: "Images Uploaded",
+                            description: `${uploadedImageUrls.length} image(s) successfully uploaded for post ${postId}.`,
+                        });
+                    })
+                    .catch(error => {
+                        console.error(`Error saving uploaded images for post ${postId}:`, error);
+                        toast({
+                            title: "Upload Save Error",
+                            description: "Failed to save the uploaded images. Please try again.",
+                            variant: "destructive",
+                        });
+                    });
+
+                return {
+                    ...p,
+                    images: imagesJsonToSave,
+                    imageUrl: newMainImageUrl,
+                    image_status: "completed",
+                };
+            }
+            return p;
+        });
+    });
+  }, [toast]); // localPosts dependency might cause re-runs, consider refining if issues arise
+
   // Check if any posts are being processed
   const isProcessingAny = Object.values(processingPosts).some(Boolean)
 
@@ -734,6 +807,7 @@ export default function GenerateMultipleImages({
             onChangeNumImages={(id, value) => updateSetting(id, "numImages", value)}
             onChangeImageStyle={(id, style) => updateSetting(id, "imageStyle", style)}
             onChangeImageService={(id, service) => updateSetting(id, "imageService", service)}
+            onImageUpload={handleImageUpload}
           />
         ))}
       </div>

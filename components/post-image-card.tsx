@@ -5,7 +5,8 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import Image from "next/image"
 import type { Post } from "./campaign-workflow"
-import { RefreshCw, Loader2, Check, AlertCircle, MinusCircle, PlusCircle, ChevronDown, ImageIcon } from "lucide-react"
+import { RefreshCw, Loader2, Check, AlertCircle, MinusCircle, PlusCircle, ChevronDown, ImageIcon, UploadCloud } from "lucide-react"
+import { UploadButton } from "@/lib/uploadthing";
 import { getPostImages, hasRealImages } from "@/lib/image-generation-utils"
 
 // Available image styles
@@ -15,7 +16,7 @@ export const IMAGE_STYLES = [
   { value: "illustration", label: "Illustration" },
   { value: "watercolor", label: "Watercolor" },
   { value: "sketch", label: "Sketch" },
-  { value: "3d_render", label: "3D Render" },
+  { value: "ghibli", label: "Ghibli" },
   { value: "pixel_art", label: "Pixel Art" },
   { value: "oil_painting", label: "Oil Painting" },
 ]
@@ -43,6 +44,7 @@ interface PostImageCardProps {
   onChangeNumImages: (postId: string | number, value: number) => void
   onChangeImageStyle: (postId: string | number, style: string) => void
   onChangeImageService: (postId: string | number, service: string) => void
+  onImageUpload: (postId: string | number, imageUrls: string[]) => void
 }
 
 export default function PostImageCard({
@@ -61,6 +63,7 @@ export default function PostImageCard({
   onChangeNumImages,
   onChangeImageStyle,
   onChangeImageService,
+  onImageUpload,
 }: PostImageCardProps) {
   const isProcessing = isGenerating || isPolling
   const postImages = getPostImages(post)
@@ -248,6 +251,29 @@ export default function PostImageCard({
                 </div>
               )}
             </div>
+
+            {/* Upload Button */}
+            <UploadButton
+              endpoint="imageUploader" // Adjust endpoint as needed
+              onClientUploadComplete={(res) => {
+                if (res && res.length > 0) {
+                  const urls = res.map(file => file.url);
+                  onImageUpload(post.id, urls);
+                }
+              }}
+              onUploadError={(error: Error) => {
+                // Do something with the error.
+                alert(`ERROR! ${error.message}`);
+              }}
+              className={`py-1 px-3 bg-blue-500 hover:bg-blue-600 text-white border-2 border-black rounded-md 
+                flex items-center gap-1 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed 
+                shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] 
+                transition-all duration-150 ${isMobile ? "w-full justify-center mt-2" : ""}`}
+              disabled={isProcessing || isSubmitting}
+            >
+              <UploadCloud size={16} />
+              Upload
+            </UploadButton>
 
             {/* Regenerate button - full width on mobile */}
             <button
