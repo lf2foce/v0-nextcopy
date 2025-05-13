@@ -294,7 +294,7 @@ export default function PostImageCard({
   }}
   appearance={{
     button: "rounded-md text-sm flex items-center justify-center",
-    container: "w-auto",
+    container: "w-auto h-[40px]",
     allowedContent: "hidden"
   }}
   onClientUploadComplete={(res) => {

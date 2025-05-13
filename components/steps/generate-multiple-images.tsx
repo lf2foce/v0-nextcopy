@@ -721,7 +721,7 @@ export default function GenerateMultipleImages({
       <div>
         <h2 className="text-2xl font-black mb-2">Generate Images</h2>
         <p className="text-gray-700">Generate and select images for your posts</p>
-        <UploadButton
+        {/* <UploadButton
         endpoint="imageUploader"
         onClientUploadComplete={(res) => {
           // Do something with the response
@@ -732,7 +732,7 @@ export default function GenerateMultipleImages({
           // Do something with the error.
           alert(`ERROR! ${error.message}`);
         }}
-      />
+      /> */}
       </div>
 
       <div className="flex justify-between items-center">
