@@ -10,6 +10,14 @@
   border: 0;
 }
 
+/* applied to button when uploading */
+.custom-button-uploading {
+  background-color: rgb(239 68 68 / 0.5);
+  color: rgb(0 0 0 / 0.5);
+  cursor: not-allowed;
+}
+
+
 @source '../*.{js,ts,jsx,tsx,mdx}';
 
 @custom-variant dark (&:is(.dark *));

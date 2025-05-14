@@ -8,11 +8,12 @@ import type { Post } from "./campaign-workflow"
 import { RefreshCw, Loader2, Check, AlertCircle, MinusCircle, PlusCircle, ChevronDown, ImageIcon, UploadCloud } from "lucide-react"
 import { UploadButton } from "@/lib/uploadthing";
 import { getPostImages, hasRealImages } from "@/lib/image-generation-utils"
+import ImageViewerModal from "@/components/ui/image-viewer-modal"
 
 // Available image styles
 export const IMAGE_STYLES = [
   { value: "realistic", label: "Realistic" },
-  { value: "cartoon", label: "Cartoon" },
+  { value: "pixar anime", label: "Cartoon" },
   { value: "illustration", label: "Illustration" },
   { value: "watercolor", label: "Watercolor" },
   { value: "sketch", label: "Sketch" },
@@ -65,6 +66,10 @@ export default function PostImageCard({
   onChangeImageService,
   onImageUpload,
 }: PostImageCardProps) {
+  // Add modal state management
+  const [viewerImages, setViewerImages] = useState<any[]>([])
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [viewerInitialIndex, setViewerInitialIndex] = useState(0)
   const isProcessing = isGenerating || isPolling
   const postImages = getPostImages(post)
   const hasGeneratedImages = hasRealImages(post)
@@ -153,13 +158,27 @@ export default function PostImageCard({
     }))
   }
 
+  const handleImageClick = (e: React.MouseEvent, imageIndex: number) => {
+    e.stopPropagation()
+    setViewerImages(postImages)
+    setViewerInitialIndex(imageIndex)
+    setViewerOpen(true)
+  }
+
   // Log when numImages changes
   useEffect(() => {
     console.debug(`Post ${post.id}: Number of images set to ${numImages}`)
   }, [numImages, post.id])
 
   return (
-    <div className="border-4 border-black rounded-md overflow-hidden bg-white">
+    <>
+      <ImageViewerModal 
+        images={viewerImages}
+        initialIndex={viewerInitialIndex}
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+      />
+      <div className="border-4 border-black rounded-md overflow-hidden bg-white">
       <div className="p-4 bg-yellow-100 border-b-4 border-black">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           {/* Selection count */}
@@ -258,7 +277,7 @@ export default function PostImageCard({
               <button
                 onClick={() => onRegenerateImages(post.id)}
                 disabled={isProcessing || isSubmitting}
-                className={`h-8 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 
+                className={`h-8 px-1 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 
                   flex items-center gap-1 text-sm disabled:opacity-50 ${isMobile ? "w-1/2 justify-center" : ""}`}
               >
                 {isProcessing ? (
@@ -286,6 +305,7 @@ export default function PostImageCard({
                         ) : (
                           <UploadCloud size={14} />
                         )}
+                        {/* {isUploading ? "Uploading..." : "Upload Images"} */}
                         {isUploading ? "Uploading..." : "Upload Images"}
                       </div>
                     );
@@ -389,8 +409,9 @@ export default function PostImageCard({
                           src={image.url || "/placeholder.svg?text=No+Image"}
                           alt={image.prompt || `Image ${imageIndex + 1}`}
                           fill
-                          className="object-cover"
+                          className="object-cover cursor-pointer"
                           onError={() => handleImageError(imageIndex)}
+                          onClick={(e) => handleImageClick(e, imageIndex)}
                           unoptimized // Skip optimization to avoid issues with external URLs
                           loading="eager" // Load immediately to detect errors faster
                         />
@@ -403,6 +424,10 @@ export default function PostImageCard({
                           className={`absolute bottom-2 right-2 w-6 h-6 flex items-center justify-center rounded-full ${
                             image.isSelected ? "bg-green-500 text-white" : "bg-white border-2 border-black"
                           }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleImageSelection(post.id, imageIndex);
+                          }}
                         >
                           {image.isSelected && <Check size={16} />}
                         </div>
@@ -426,5 +451,7 @@ export default function PostImageCard({
         )}
       </div>
     </div>
+    </>
   )
+  
 }

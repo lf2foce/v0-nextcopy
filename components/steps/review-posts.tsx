@@ -711,7 +711,7 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
                         <p className="text-sm text-gray-600 mt-2">
                           Click to view larger image. Hold Ctrl/Cmd while clicking to select/deselect.
                         </p>
-                        <div className="flex justify-end mt-2">
+                        {/* <div className="flex justify-end mt-2">
                           <button
                             onClick={() => handleRegenerateImage(post.id)}
                             disabled={isRegeneratingImage || isRegeneratingPost || isEditing || isRegeneratingVideo}
@@ -720,7 +720,7 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
                             <RefreshCw size={14} />
                             New Image
                           </button>
-                        </div>
+                        </div> */}
                       </>
                     )}
                   </div>
@@ -782,7 +782,7 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
                         Edit Content
                       </button>
 
-                      <button
+                      {/* <button
                         onClick={() => handleRegeneratePost(post.id)}
                         disabled={isRegeneratingPost || isRegeneratingImage || isEditing || isRegeneratingVideo}
                         className="py-1 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 flex items-center gap-1 text-sm disabled:opacity-50"
@@ -798,7 +798,7 @@ export default function ReviewPosts({ posts, onComplete, onBack }: ReviewPostsPr
                             New Content
                           </>
                         )}
-                      </button>
+                      </button> */}
                     </div>
                   )}
                 </div>
