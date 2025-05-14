@@ -2,6 +2,13 @@
 
 @import "uploadthing/tw/v4";
 @source "../node_modules/@uploadthing/react/dist";
+/* applied to container */
+.custom-container {
+  background-color: none;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
 
 @source '../*.{js,ts,jsx,tsx,mdx}';
 

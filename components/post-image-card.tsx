@@ -172,7 +172,7 @@ export default function PostImageCard({
           {/* Image generation controls - now more responsive */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Number of images selector */}
-            <div className="flex items-center gap-2 bg-white border-2 border-black rounded-md px-2 py-1">
+            <div className="flex items-center gap-2 bg-white border-2 border-black rounded-md px-2 h-8">
               <button
                 onClick={() => onChangeNumImages(post.id, Math.max(1, numImages - 1))}
                 disabled={numImages <= 1 || isProcessing}
@@ -197,7 +197,7 @@ export default function PostImageCard({
               <button
                 onClick={toggleStyleDropdown}
                 disabled={isProcessing}
-                className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 py-1 text-sm w-24 sm:w-32 disabled:opacity-50"
+                className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 h-8 text-sm w-24 sm:w-32 disabled:opacity-50"
               >
                 <span className="truncate">
                   {IMAGE_STYLES.find((style) => style.value === imageStyle)?.label || "Realistic"}
@@ -227,7 +227,7 @@ export default function PostImageCard({
               <button
                 onClick={toggleServiceDropdown}
                 disabled={isProcessing}
-                className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 py-1 text-sm w-24 sm:w-32 disabled:opacity-50"
+                className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-md px-3 h-8 text-sm w-24 sm:w-32 disabled:opacity-50"
               >
                 <span className="truncate">
                   {IMAGE_SERVICES.find((service) => service.value === imageService)?.label || "Flux"}
@@ -252,63 +252,64 @@ export default function PostImageCard({
               )}
             </div>
 
-            
+            {/* Wrapper for Regenerate and Upload buttons for mobile layout */}
+            <div className={isMobile ? "flex w-full gap-2 mt-2" : "contents"}>
+              {/* Regenerate button - full width on mobile */}
+              <button
+                onClick={() => onRegenerateImages(post.id)}
+                disabled={isProcessing || isSubmitting}
+                className={`h-8 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 
+                  flex items-center gap-1 text-sm disabled:opacity-50 ${isMobile ? "w-1/2 justify-center" : ""}`}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    {isPolling ? "Generating..." : "Regenerating..."}
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw size={14} />
+                    {hasGeneratedImages ? "Regenerate Images" : "Generate Images"}
+                  </>
+                )}
+              </button>
 
-            {/* Regenerate button - full width on mobile */}
-            <button
-              onClick={() => onRegenerateImages(post.id)}
-              disabled={isProcessing || isSubmitting}
-              className={`py-1 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 
-                flex items-center gap-1 text-sm disabled:opacity-50 ${isMobile ? "w-full justify-center mt-2" : ""}`}
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  {isPolling ? "Generating..." : "Regenerating..."}
-                </>
-              ) : (
-                <>
-                  <RefreshCw size={14} />
-                  {hasGeneratedImages ? "Regenerate Images" : "Generate Images"}
-                </>
-              )}
-            </button>
-
-            {/* Upload Button */}
-            <UploadButton
-  endpoint="imageUploader"
-  content={{
-    button({ isUploading }) {
-      return (
-        <div className="flex items-center gap-1">
-          {isUploading ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <UploadCloud size={14} />
-          )}
-          {isUploading ? "Uploading..." : "Upload Images"}
-        </div>
-      );
-    },
-    allowedContent: ""
-  }}
-  appearance={{
-    button: "rounded-md text-sm flex items-center justify-center",
-    container: "w-auto h-[40px]",
-    allowedContent: "hidden"
-  }}
-  onClientUploadComplete={(res) => {
-    if (res && res.length > 0) {
-      const urls = res.map(file => file.ufsUrl);
-      onImageUpload(post.id, urls);
-    }
-  }}
-  onUploadError={(error: Error) => {
-    alert(`ERROR! ${error.message}`);
-  }}
-  className={`py-1 px-3 ${isMobile ? "w-full mt-2" : ""}`}
-  disabled={isProcessing || isSubmitting}
-/>
+              {/* Upload Button */}
+              <UploadButton
+                endpoint="imageUploader"
+                content={{
+                  button({ isUploading }) {
+                    return (
+                      <div className="flex items-center gap-1">
+                        {isUploading ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <UploadCloud size={14} />
+                        )}
+                        {isUploading ? "Uploading..." : "Upload Images"}
+                      </div>
+                    );
+                  },
+                  allowedContent: ""
+                }}
+                appearance={{
+                  button: `rounded-md text-sm flex items-center justify-center ${isMobile ? "w-full" : ""}`,
+                  container: `custom-container h-8 ${isMobile ? "w-1/2" : "w-auto"}`,
+                  allowedContent: "hidden"
+                }}
+                onClientUploadComplete={(res) => {
+                  if (res && res.length > 0) {
+                    const urls = res.map(file => file.ufsUrl);
+                    onImageUpload(post.id, urls);
+                  }
+                }}
+                onUploadError={(error: Error) => {
+                  alert(`ERROR! ${error.message}`);
+                }}
+                className={`px-3 ${isMobile ? "" : ""}`}
+                disabled={isProcessing || isSubmitting}
+              />
+            </div>
           </div>
         </div>
 
