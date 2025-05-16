@@ -173,7 +173,7 @@ export default function GenerateMultipleImages({
       initialSettings[post.id] = {
         numImages: 1,
         imageStyle: "realistic",
-        imageService: "flux",
+        imageService: "locaith",
       }
     })
     setSettings(initialSettings)
@@ -264,7 +264,7 @@ export default function GenerateMultipleImages({
         const { numImages, imageStyle, imageService } = settings[postId] || {
           numImages: 1,
           imageStyle: "realistic",
-          imageService: "flux",
+          imageService: "locaith",
         }
 
         // Call API

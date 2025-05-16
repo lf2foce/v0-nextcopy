@@ -13,7 +13,7 @@ export async function POST(request: NextRequest, { params }: { params: { postId:
     const searchParams = request.nextUrl.searchParams
     const numImages = searchParams.get("num_images") || "1"
     const imageStyle = searchParams.get("style") || "realistic"
-    const imageService = searchParams.get("image_service") || "flux" // Add image service parameter with default
+    const imageService = searchParams.get("image_service") || "locaith" // Default image service set to Locaith
 
     console.debug(`Generating images for post ${postId}: ${numImages} ${imageStyle} images via ${imageService}`)
 

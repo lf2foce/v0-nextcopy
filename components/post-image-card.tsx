@@ -13,7 +13,7 @@ import ImageViewerModal from "@/components/ui/image-viewer-modal"
 // Available image styles
 export const IMAGE_STYLES = [
   { value: "realistic", label: "Realistic" },
-  { value: "pixar anime", label: "Cartoon" },
+  { value: "cartoon", label: "Cartoon" },
   { value: "illustration", label: "Illustration" },
   { value: "watercolor", label: "Watercolor" },
   { value: "sketch", label: "Sketch" },

@@ -106,7 +106,7 @@ export default function ImageViewerModal({ images, initialIndex = 0, isOpen, onC
                   <p>Failed to load image</p>
                   <p className="text-sm text-gray-400 mt-2">URL: {currentImage.url}</p>
                 </div>
-              ) : (
+              ) : currentImage ? (
                 <img
                   ref={imageRef}
                   src={currentImage.url || "/placeholder.svg"}
@@ -115,6 +115,10 @@ export default function ImageViewerModal({ images, initialIndex = 0, isOpen, onC
                   style={{ margin: 0 }}
                   onError={handleImageError}
                 />
+              ) : (
+                <div className="flex flex-col items-center justify-center text-white">
+                  <p>No image available</p>
+                </div>
               )}
               {/* Navigation arrows */}
               {images.length > 1 && (
