@@ -24,9 +24,10 @@ export const IMAGE_STYLES = [
 
 // Available image services
 export const IMAGE_SERVICES = [
+  { value: "locaith", label: "Locaith" },
   { value: "flux", label: "Flux" },
   { value: "gemini", label: "Gemini" },
-  { value: "ideogram", label: "Ideogram" },
+  { value: "ideogram", label: "Ideogram" }
 ]
 
 interface PostImageCardProps {
