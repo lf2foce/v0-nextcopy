@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import type { Post } from "../campaign-workflow"
-import { Loader2, RefreshCw, Play, CheckCircle, Eye } from "lucide-react"
+import { Loader2, RefreshCw, Play, CheckCircle, Eye, AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { updatePostVideos } from "@/lib/actions"
 
@@ -101,9 +101,9 @@ interface GenerateVideoProps {
 }
 
 export default function GenerateVideo({ posts, onComplete, onBack, skipIfNoImages = false }: GenerateVideoProps) {
-  const [localPosts, setLocalPosts] = useState<Post[]>(posts)
+  const [localPosts, setLocalPosts] = useState<LocalPost[]>(posts.map(p => ({ ...p, generationStatus: 'idle' })))
   const [isGeneratingAll, setIsGeneratingAll] = useState(false)
-  const [generatingPostId, setGeneratingPostId] = useState<string | number | null>(null)
+  const [generatingPostId, setGeneratingPostId] = useState<string | number | null>(null) // Used for individual regeneration spinner
   const [generationProgress, setGenerationProgress] = useState(0)
   const [allVideosGenerated, setAllVideosGenerated] = useState(false)
   const [isFinalizing, setIsFinalizing] = useState(false)
@@ -128,175 +128,285 @@ export default function GenerateVideo({ posts, onComplete, onBack, skipIfNoImage
 
   // Progress interval reference
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const pollingIntervalsRef = useRef<Map<string | number, NodeJS.Timeout>>(new Map()) // Store polling intervals for each post
 
-  // Check if posts already have videos (for when returning to this step)
+  // Initialize localPosts and check existing videos
   useEffect(() => {
-    // Initialize localPosts with the provided posts
-    const postsWithValidData = posts.map((post) => {
-      // Ensure post has at least a placeholder video URL if none exists
-      if (!post.videoUrl) {
-        return {
-          ...post,
-          videoUrl: "/placeholder.mp4",
-          videoGenerated: false,
-        }
-      }
-      return post
+    const postsWithInitialStatus = posts.map((post) => {
+      const hasExistingVideo = post.videoUrl && post.videoUrl !== "/placeholder.mp4"
+      return {
+        ...post,
+        videoUrl: post.videoUrl || "/placeholder.mp4",
+        videoGenerated: hasExistingVideo,
+        generationStatus: hasExistingVideo ? "succeeded" : "idle",
+      } as LocalPost
     })
 
-    setLocalPosts(postsWithValidData)
+    setLocalPosts(postsWithInitialStatus)
 
-    // Check if ALL posts have valid videos
-    const hasAllVideos = postsWithValidData.every((post) => {
-      return post.videoUrl && post.videoUrl !== "/placeholder.mp4"
-    })
-
+    const hasAllVideos = postsWithInitialStatus.every((post) => post.videoGenerated)
     setAllVideosGenerated(hasAllVideos)
   }, [posts])
 
-  // Clean up interval on unmount
+  // Clean up intervals on unmount
   useEffect(() => {
     return () => {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current)
       }
+      pollingIntervalsRef.current.forEach(interval => clearInterval(interval));
+      pollingIntervalsRef.current.clear();
     }
   }, [])
 
-  // Function to generate a real video URL
-  const generateVideoUrl = (postId: string | number) => {
-    // Get a random video from the sample videos
-    const randomIndex = Math.floor(Math.random() * sampleVideoUrls.length)
-    return sampleVideoUrls[randomIndex]
+  // Helper function to get selected images from a post
+  const getSelectedImagesForApi = (post: LocalPost) => {
+    if (!post.images) {
+      if (post.image && !post.image.includes("placeholder")) return [post.image];
+      if (post.imageUrl && !post.imageUrl.includes("placeholder")) return [post.imageUrl];
+      return []
+    }
+    try {
+      const imagesData = JSON.parse(post.images)
+      return (imagesData.images || [])
+        .filter((img: any) => img.isSelected === true && img.url && !img.url.includes("placeholder"))
+        .map((img: any) => img.url)
+    } catch (e) {
+      if (post.image && !post.image.includes("placeholder")) return [post.image];
+      if (post.imageUrl && !post.imageUrl.includes("placeholder")) return [post.imageUrl];
+      return []
+    }
   }
+
+  // Polling function for video status
+  const pollForVideoStatus = async (postId: string | number, taskId: string) => {
+    const intervalId = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/generate-video?taskId=${taskId}`);
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          const { status, video_url, error: taskError } = result.data; // FastAPI returns result.data for status
+
+          if (status === 'completed' || status === 'SUCCESS') { // Changed 'SUCCESS' to 'completed' || 'SUCCESS'
+            clearInterval(intervalId);
+            pollingIntervalsRef.current.delete(postId);
+            setLocalPosts(prevPosts =>
+              prevPosts.map(p =>
+                p.id === postId
+                  ? { ...p, videoUrl: video_url, videoGenerated: true, generationStatus: 'succeeded', generationTaskId: undefined, errorMessage: undefined }
+                  : p
+              )
+            );
+            // If this was the last generating post during 'Generate All', update database
+            if (typeof postId === 'number') {
+                await updatePostVideos([{ id: postId, video: video_url as string }]);
+            }
+            toast({ title: "Video Ready", description: `Video for post ${postId} is ready.` });
+
+            // Check if all videos are now generated
+            setLocalPosts(currentPosts => {
+                const allDone = currentPosts.every(p => p.generationStatus === 'succeeded' || (p.videoUrl && p.videoUrl !== '/placeholder.mp4'));
+                if (allDone) {
+                    setAllVideosGenerated(true);
+                    setIsGeneratingAll(false); // Ensure this is reset
+                    setGenerationProgress(100);
+                }
+                return currentPosts;
+            });
+
+          } else if (status === 'FAILURE' || status === 'failed') { // Added 'failed' for robustness
+            clearInterval(intervalId);
+            pollingIntervalsRef.current.delete(postId);
+            setLocalPosts(prevPosts =>
+              prevPosts.map(p =>
+                p.id === postId ? { ...p, generationStatus: 'failed', videoGenerated: false, errorMessage: taskError || 'Video generation failed.' } : p
+              )
+            );
+            toast({ title: "Error", description: `Video generation failed for post ${postId}: ${taskError || 'Unknown error'}`, variant: "destructive" });
+          } else if (status === 'PENDING' || status === 'PROCESSING' || status === 'pending' || status === 'processing') { // Added lowercase for robustness
+            // Still generating, continue polling
+            setLocalPosts(prevPosts =>
+              prevPosts.map(p => (p.id === postId ? { ...p, generationStatus: 'generating' } : p))
+            );
+          }
+        } else {
+          // API call to polling endpoint failed
+          clearInterval(intervalId);
+          pollingIntervalsRef.current.delete(postId);
+          setLocalPosts(prevPosts =>
+            prevPosts.map(p => (p.id === postId ? { ...p, generationStatus: 'failed', errorMessage: result.error || 'Polling request failed' } : p))
+          );
+          toast({ title: "Polling Error", description: `Failed to get status for post ${postId}: ${result.error}`, variant: "destructive" });
+        }
+      } catch (error) {
+        clearInterval(intervalId);
+        pollingIntervalsRef.current.delete(postId);
+        console.error("Polling error:", error);
+        setLocalPosts(prevPosts =>
+          prevPosts.map(p => (p.id === postId ? { ...p, generationStatus: 'failed', errorMessage: 'Polling exception' } : p))
+        );
+        toast({ title: "Polling Error", description: `An error occurred while polling for post ${postId}.`, variant: "destructive" });
+      }
+    }, 5000); // Poll every 5 seconds
+
+    pollingIntervalsRef.current.set(postId, intervalId);
+  };
 
   // Function to generate videos for all posts
   const generateAllVideos = async () => {
-    setIsGeneratingAll(true)
-    setGenerationProgress(0)
+    setIsGeneratingAll(true);
+    setGenerationProgress(0);
+    setAllVideosGenerated(false);
 
-    const updatedPosts = [...localPosts]
-    const postsToUpdate: { id: number; video: string }[] = []
+    // Clear any previous polling intervals
+    pollingIntervalsRef.current.forEach(interval => clearInterval(interval));
+    pollingIntervalsRef.current.clear();
 
-    // Set up progress interval - increment every 200ms
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current)
-    }
+    // Reset status for all posts
+    setLocalPosts(prevPosts => prevPosts.map(p => ({ ...p, generationStatus: 'pending_request', videoGenerated: false, videoUrl: '/placeholder.mp4', errorMessage: undefined })))
 
-    progressIntervalRef.current = setInterval(() => {
-      setGenerationProgress((prev) => {
-        // Increase by random amount between 1-5%
-        const increment = Math.floor(Math.random() * 5) + 1
-        const newProgress = Math.min(prev + increment, 95)
-        return newProgress
-      })
-    }, 200)
+    let postsSuccessfullyInitiated = 0;
+    const totalPostsToProcess = localPosts.length;
 
-    // Generate videos for all posts
-    for (let i = 0; i < updatedPosts.length; i++) {
-      const newVideoUrl = generateVideoUrl(updatedPosts[i].id)
-      updatedPosts[i] = {
-        ...updatedPosts[i],
-        videoUrl: newVideoUrl,
-        videoGenerated: true,
+    for (const post of localPosts) {
+      // Skip posts that don't have images if skipIfNoImages is true and hasPostsWithImages is false (though UI should prevent this)
+      const selectedImageUrls = getSelectedImagesForApi(post);
+      if (skipIfNoImages && !hasPostsWithImages && selectedImageUrls.length === 0) {
+        setLocalPosts(prev => prev.map(p => p.id === post.id ? {...p, generationStatus: 'idle', errorMessage: 'Skipped, no images'} : p));
+        continue;
       }
 
-      // If the post has a numeric ID, add it to the list to update in the database
-      if (typeof updatedPosts[i].id === "number") {
-        postsToUpdate.push({
-          id: updatedPosts[i].id as number,
-          video: newVideoUrl,
-        })
-      }
-    }
+      try {
+        const payload = {
+          postId: post.id,
+          content: post.content,
+          imageUrls: selectedImageUrls,
+          // Pass other details if available, e.g., from campaign or theme context
+          // theme: post.themeName, // Example: if post object had themeName
+        };
 
-    // Update posts with videos after a short delay to simulate background processing
-    setTimeout(async () => {
-      // Clear the progress interval
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current)
-        progressIntervalRef.current = null
-      }
+        const response = await fetch("/api/generate-video", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
 
-      // Update the database if we have numeric IDs
-      if (postsToUpdate.length > 0) {
-        try {
-          const result = await updatePostVideos(postsToUpdate)
-          if (!result.success) {
-            toast({
-              title: "Warning",
-              description: "Videos generated but not all saved to database",
-              variant: "destructive",
-            })
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          if (result.taskId) {
+            setLocalPosts(prev => prev.map(p => p.id === post.id ? {...p, generationStatus: 'generating', generationTaskId: result.taskId } : p));
+            pollForVideoStatus(post.id, result.taskId);
+          } else if (result.videoUrl) {
+            setLocalPosts(prev => prev.map(p => p.id === post.id ? {...p, videoUrl: result.videoUrl, videoGenerated: true, generationStatus: 'succeeded' } : p));
+            if (typeof post.id === 'number') {
+                await updatePostVideos([{ id: post.id, video: result.videoUrl }]);
+            }
+          } else {
+            setLocalPosts(prev => prev.map(p => p.id === post.id ? {...p, generationStatus: 'failed', errorMessage: result.error || 'No video URL or task ID received.' } : p));
           }
-        } catch (error) {
-          console.error("Error updating post videos:", error)
-          toast({
-            title: "Warning",
-            description: "Videos generated but not saved to database",
-            variant: "destructive",
-          })
+          postsSuccessfullyInitiated++;
+        } else {
+          setLocalPosts(prev => prev.map(p => p.id === post.id ? {...p, generationStatus: 'failed', errorMessage: result.error || `API request failed (${response.status})` } : p));
         }
+      } catch (error) {
+        console.error(`Error generating video for post ${post.id}:`, error);
+        setLocalPosts(prev => prev.map(p => p.id === post.id ? {...p, generationStatus: 'failed', errorMessage: error instanceof Error ? error.message : 'Network error' } : p));
       }
+      // Update progress based on initiated requests, actual progress will be when polling completes
+      setGenerationProgress(Math.round((postsSuccessfullyInitiated / totalPostsToProcess) * 50)); // Cap at 50% for initiation
+    }
 
-      setLocalPosts(updatedPosts)
-      setGenerationProgress(100)
-      setAllVideosGenerated(true)
-      setIsGeneratingAll(false)
+    if (postsSuccessfullyInitiated === 0 && totalPostsToProcess > 0) {
+        setIsGeneratingAll(false);
+        toast({ title: "Error", description: "Could not initiate video generation for any post.", variant: "destructive" });
+        return;
+    }
 
-      toast({
-        title: "Videos generated",
-        description: "All videos have been generated successfully.",
-      })
-    }, 3000)
+    // If all posts were synchronous and successful (unlikely with polling)
+    const allSyncSuccess = localPosts.every(p => p.generationStatus === 'succeeded');
+    if (allSyncSuccess) {
+        setAllVideosGenerated(true);
+        setIsGeneratingAll(false);
+        setGenerationProgress(100);
+        toast({ title: "Videos Generated", description: "All videos generated successfully." });
+    } else {
+        // For async, we wait for polls. Progress bar might show 50% for initiation.
+        // Actual completion to 100% and setIsGeneratingAll(false) will be handled by the last poll callback.
+        toast({ title: "Generation Started", description: "Video generation process has been initiated for all posts." });
+    }
   }
 
   // Function to regenerate a single video
   const regenerateVideo = async (postId: string | number) => {
-    setGeneratingPostId(postId)
+    setGeneratingPostId(postId) // For individual spinner
+    setLocalPosts(prevPosts =>
+      prevPosts.map(p => (p.id === postId ? { ...p, generationStatus: 'pending_request', videoGenerated: false, videoUrl: '/placeholder.mp4', errorMessage: undefined } : p))
+    );
+
+    // Clear previous polling interval for this post if any
+    if (pollingIntervalsRef.current.has(postId)) {
+        clearInterval(pollingIntervalsRef.current.get(postId)!);
+        pollingIntervalsRef.current.delete(postId);
+    }
+
+    const post = localPosts.find(p => p.id === postId);
+    if (!post) {
+      toast({ title: "Error", description: "Post not found.", variant: "destructive" });
+      setGeneratingPostId(null);
+      return;
+    }
+
+    const selectedImageUrls = getSelectedImagesForApi(post);
 
     try {
-      // Generate a new video URL
-      const newVideoUrl = generateVideoUrl(postId)
+      const payload = {
+        postId: post.id,
+        content: post.content,
+        imageUrls: selectedImageUrls,
+      };
 
-      // Update the database if we have a numeric ID
-      if (typeof postId === "number") {
-        const result = await updatePostVideos([{ id: postId, video: newVideoUrl }])
-        if (!result.success) {
-          toast({
-            title: "Warning",
-            description: "Video regenerated but not saved to database",
-            variant: "destructive",
-          })
+      const response = await fetch("/api/generate-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        if (result.taskId) {
+          setLocalPosts(prev => prev.map(p => p.id === postId ? { ...p, generationStatus: 'generating', generationTaskId: result.taskId } : p));
+          pollForVideoStatus(postId, result.taskId);
+        } else if (result.videoUrl) {
+          setLocalPosts(prev => prev.map(p => p.id === postId ? { ...p, videoUrl: result.videoUrl, videoGenerated: true, generationStatus: 'succeeded' } : p));
+          if (typeof postId === 'number') {
+            await updatePostVideos([{ id: postId, video: result.videoUrl }]);
+          }
+          toast({ title: "Video Regenerated", description: "The video has been regenerated successfully." });
+        } else {
+            setLocalPosts(prev => prev.map(p => p.id === postId ? {...p, generationStatus: 'failed', errorMessage: result.error || 'No video URL or task ID received.' } : p));
+            toast({ title: "Error", description: result.error || "Failed to regenerate video.", variant: "destructive" });
         }
+      } else {
+        setLocalPosts(prev => prev.map(p => p.id === postId ? { ...p, generationStatus: 'failed', errorMessage: result.error || `API request failed (${response.status})` } : p));
+        toast({ title: "Error", description: result.error || "Failed to regenerate video.", variant: "destructive" });
       }
-
-      // Update the specific post with a new video
-      setLocalPosts((prevPosts) =>
-        prevPosts.map((post) =>
-          post.id === postId
-            ? {
-                ...post,
-                videoUrl: newVideoUrl,
-                videoGenerated: true,
-              }
-            : post,
-        ),
-      )
-
-      toast({
-        title: "Video regenerated",
-        description: "The video has been regenerated successfully.",
-      })
     } catch (error) {
-      console.error("Error regenerating video:", error)
-      toast({
-        title: "Error",
-        description: "Failed to regenerate video",
-        variant: "destructive",
-      })
+      console.error(`Error regenerating video for post ${postId}:`, error);
+      setLocalPosts(prev => prev.map(p => p.id === postId ? { ...p, generationStatus: 'failed', errorMessage: error instanceof Error ? error.message : 'Network error' } : p));
+      toast({ title: "Error", description: "An unexpected error occurred while regenerating the video.", variant: "destructive" });
     } finally {
-      setGeneratingPostId(null)
+      setGeneratingPostId(null);
+      // Check if all videos are now generated after this regeneration
+      setLocalPosts(currentPosts => {
+        const allDone = currentPosts.every(p => p.generationStatus === 'succeeded' || (p.videoUrl && p.videoUrl !== '/placeholder.mp4'));
+        if (allDone) {
+            setAllVideosGenerated(true);
+        }
+        return currentPosts;
+      });
     }
   }
 
@@ -309,11 +419,7 @@ export default function GenerateVideo({ posts, onComplete, onBack, skipIfNoImage
       onComplete(localPosts)
     } catch (error) {
       console.error("Error completing video generation:", error)
-      toast({
-        title: "Error",
-        description: "Failed to complete video generation",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Failed to complete video generation", variant: "destructive" });
     } finally {
       setIsFinalizing(false)
     }
@@ -373,10 +479,10 @@ export default function GenerateVideo({ posts, onComplete, onBack, skipIfNoImage
         </div>
       )}
 
-      {isGeneratingAll && (
+      {isGeneratingAll && generationProgress < 100 && (
         <div className="bg-gray-100 border-4 border-black rounded-md p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="font-bold">Generating videos...</span>
+            <span className="font-bold">Generating all videos... ({localPosts.filter(p => p.generationStatus === 'generating' || p.generationStatus === 'pending_request').length} pending)</span>
             <span className="font-bold">{generationProgress}%</span>
           </div>
           <div className="w-full bg-gray-300 h-4 rounded-md border-2 border-black overflow-hidden">
@@ -513,15 +619,20 @@ export default function GenerateVideo({ posts, onComplete, onBack, skipIfNoImage
                       <Play size={16} className="text-black" />
                       <span className="font-medium">Video Status:</span>
                     </div>
-                    {hasVideo ? (
+                    {post.generationStatus === 'succeeded' ? (
                       <span className="flex items-center gap-1 text-green-600">
                         <CheckCircle size={16} />
                         Generated
                       </span>
-                    ) : isGenerating ? (
+                    ) : post.generationStatus === 'generating' || post.generationStatus === 'pending_request' ? (
                       <span className="flex items-center gap-1">
                         <Loader2 size={16} className="animate-spin" />
                         Generating...
+                      </span>
+                    ) : post.generationStatus === 'failed' ? (
+                      <span className="flex items-center gap-1 text-red-500">
+                        <AlertTriangle size={16} />
+                        Failed {post.errorMessage && post.errorMessage.length > 30 ? `(${post.errorMessage.substring(0,27)}...)` : post.errorMessage ? `(${post.errorMessage})` : ''}
                       </span>
                     ) : (
                       <span className="text-gray-500">Not generated</span>
