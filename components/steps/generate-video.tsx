@@ -499,11 +499,20 @@ export default function GenerateVideo({ posts, onComplete, onBack, skipIfNoImage
         <div className="flex justify-center mb-4">
           <button
             onClick={generateAllVideos}
-            disabled={isGeneratingAll}
-            className="py-3 px-6 bg-yellow-300 border-4 border-black rounded-md font-bold text-lg hover:bg-yellow-400 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2"
+            disabled={isGeneratingAll || localPosts.some(p => p.generationStatus === 'generating')}
+            className="py-3 px-6 bg-yellow-300 border-4 border-black rounded-md font-bold text-lg hover:bg-yellow-400 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:bg-yellow-300"
           >
-            <Play size={20} />
-            {allVideosGenerated ? "Regenerate All Videos" : "Generate All Videos"}
+            {isGeneratingAll ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                Generating Videos...
+              </>
+            ) : (
+              <>
+                <Play size={20} />
+                {allVideosGenerated ? "Regenerate All Videos" : "Generate All Videos"}
+              </>
+            )}
           </button>
         </div>
       )}
@@ -652,10 +661,10 @@ export default function GenerateVideo({ posts, onComplete, onBack, skipIfNoImage
                   )}
                   <button
                     onClick={() => regenerateVideo(post.id)}
-                    disabled={isGenerating || isGeneratingAll}
-                    className="py-1 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 flex items-center gap-1 text-sm disabled:opacity-50"
+                    disabled={generatingPostId === post.id || isGeneratingAll || post.generationStatus === 'generating'}
+                    className="py-1 px-3 bg-purple-300 border-2 border-black rounded-md hover:bg-purple-400 flex items-center gap-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-purple-300"
                   >
-                    {isGenerating ? (
+                    {generatingPostId === post.id ? (
                       <>
                         <Loader2 size={14} className="animate-spin" />
                         Generating...
@@ -678,7 +687,7 @@ export default function GenerateVideo({ posts, onComplete, onBack, skipIfNoImage
         <button
           onClick={onBack}
           disabled={isGeneratingAll || generatingPostId !== null || isFinalizing}
-          className="py-3 px-6 bg-white border-4 border-black rounded-md font-bold text-lg hover:bg-gray-100 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:opacity-70"
+          className="py-3 px-6 bg-white border-4 border-black rounded-md font-bold text-lg hover:bg-gray-100 transform hover:-translate-y-1 transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:opacity-70 disabled:transform-none disabled:hover:bg-white"
         >
           Back
         </button>

@@ -314,7 +314,7 @@ export default function PostImageCard({
                   allowedContent: ""
                 }}
                 appearance={{
-                  button: `rounded-md text-sm flex items-center justify-center ${isMobile ? "w-full" : ""}`,
+                  button: `bg-white border-2 border-black rounded-md text-sm flex items-center justify-center ${isMobile ? "w-full" : ""}`,
                   container: `custom-container h-8 ${isMobile ? "w-1/2" : "w-auto"}`,
                   allowedContent: "hidden"
                 }}
