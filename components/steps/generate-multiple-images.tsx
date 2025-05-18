@@ -43,7 +43,7 @@ export default function GenerateMultipleImages({
   const { toast } = useToast()
 
   // Handler for when an image is uploaded via PostImageCard
-  const handleImageUpload = useCallback(async (postId: string | number, uploadedImageUrls: string[]) => {
+  const handleImageUpload = useCallback((postId: string | number, uploadedImageUrls: string[]) => {
     if (typeof postId !== 'number') {
       toast({
         title: "Error",
@@ -61,66 +61,77 @@ export default function GenerateMultipleImages({
       return;
     }
 
-    // Process the update in a useEffect-like manner
-    const processUpload = async () => {
-      const updatedPosts = (prevPosts: Post[]) => {
-        return prevPosts.map(p => {
-            if (p.id === postId) {
-                let existingImages: any[] = [];
-                try {
-                    const imagesString = typeof p.images === 'string' ? p.images : '{"images":[]}';
-                    const imagesData = JSON.parse(imagesString);
-                    existingImages = imagesData.images || [];
-                } catch (e) {
-                    console.error("Error parsing existing images JSON for save:", e);
-                    existingImages = [];
-                }
+    // Defer the entire operation to run after the current render cycle
+    setTimeout(async () => {
+      let imagesJsonToSaveForApi: string | undefined;
+      let mainImageUrlForApi: string | undefined;
+      let postNumericIdForApi: number | undefined;
 
-                const newImagesData = uploadedImageUrls.map((url, index) => ({
-                    url: url,
-                    isSelected: true,
-                    prompt: "Uploaded image",
-                    order: existingImages.length + index,
-                    metadata: { service: "upload", style: "uploaded" },
-                }));
-
-                const allImages = [...existingImages, ...newImagesData];
-                const selectedImage = allImages.find(img => img.isSelected);
-                const newMainImageUrl = selectedImage ? selectedImage.url : (allImages.length > 0 ? allImages[0].url : p.imageUrl);
-                const imagesJsonToSave = JSON.stringify({ images: allImages });
-
-                saveImageSelection(postId as number, imagesJsonToSave, newMainImageUrl)
-                    .then(() => {
-                        toast({
-                            title: "Images Uploaded",
-                            description: `${uploadedImageUrls.length} image(s) successfully uploaded for post ${postId}.`,
-                        });
-                    })
-                    .catch(error => {
-                        console.error(`Error saving uploaded images for post ${postId}:`, error);
-                        toast({
-                            title: "Upload Save Error",
-                            description: "Failed to save the uploaded images. Please try again.",
-                            variant: "destructive",
-                        });
-                    });
-
-                return {
-                    ...p,
-                    images: imagesJsonToSave,
-                    imageUrl: newMainImageUrl,
-                    image_status: "completed",
-                };
+      // Update local state. The function passed to setLocalPosts should be pure.
+      setLocalPosts(prevPosts =>
+        prevPosts.map(p => {
+          if (p.id === postId && typeof postId === 'number') { // Ensure postId is a number for saving
+            let existingImages: any[] = [];
+            try {
+              // Ensure p.images is a string before parsing. Default to empty array string if not.
+              const imagesString = typeof p.images === 'string' && p.images.trim() !== '' ? p.images : '{"images":[]}';
+              const imagesData = JSON.parse(imagesString);
+              existingImages = Array.isArray(imagesData.images) ? imagesData.images : [];
+            } catch (e) {
+              console.error("Error parsing existing images JSON for state update:", e);
+              existingImages = []; // Fallback to empty if parsing fails
             }
-            return p;
-        });
-      };
 
-      setLocalPosts(updatedPosts);
-    };
+            const newImagesData = uploadedImageUrls.map((url, index) => ({
+              url: url,
+              isSelected: true, // Default new uploads to selected
+              prompt: "Uploaded image",
+              order: existingImages.length + index, // Append to existing images
+              metadata: { service: "upload", style: "uploaded" },
+            }));
 
-    // Queue the state update
-    setTimeout(processUpload, 0);
+            const allImages = [...existingImages, ...newImagesData];
+            
+            const newlySelectedImage = allImages.find(img => img.isSelected && img.url);
+            const mainImageForUi = newlySelectedImage?.url || (allImages.length > 0 && allImages[0].url) || p.imageUrl;
+            const imagesForUiJson = JSON.stringify({ images: allImages });
+
+            imagesJsonToSaveForApi = imagesForUiJson;
+            mainImageUrlForApi = mainImageForUi;
+            postNumericIdForApi = postId;
+
+            return {
+              ...p,
+              images: imagesForUiJson,
+              imageUrl: mainImageForUi,
+              image_status: "completed",
+            };
+          }
+          return p;
+        })
+      );
+
+      if (postNumericIdForApi !== undefined && imagesJsonToSaveForApi && mainImageUrlForApi !== undefined) {
+        try {
+          await saveImageSelection(postNumericIdForApi, imagesJsonToSaveForApi, mainImageUrlForApi);
+          toast({
+            title: "Images Uploaded",
+            description: `${uploadedImageUrls.length} image(s) successfully uploaded for post ${postNumericIdForApi}.`,
+          });
+        } catch (error: any) {
+          console.error(`Error saving uploaded images for post ${postNumericIdForApi}:`, error);
+          toast({
+            title: "Upload Save Error",
+            description: `Failed to save the uploaded images for post ${postNumericIdForApi}. Error: ${error.message || 'Unknown error'}.`,
+            variant: "destructive",
+          });
+        }
+      } else if (typeof postId === 'number') {
+        // This case implies postId was a number, but the post wasn't found in localPosts,
+        // or data for saving wasn't prepared correctly.
+        console.warn(`Upload for post ${postId} (numeric) was processed for UI, but not saved to server. Post not found in local state or data incomplete for API call.`);
+      }
+    }, 0);
   }, [toast]);
 
   // Check if any posts are being processed
