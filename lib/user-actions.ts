@@ -83,7 +83,8 @@ export async function getOrCreateUser() {
       data: newUser[0],
     };
   } catch (err) {
-    console.error("USER_ACTIONS: Error in getOrCreateUser for userId: " + (auth().userId || 'unknown') + ", error:", err);
+    // Sửa lỗi: auth() trả về một Promise, không thể truy cập .userId trực tiếp
+    console.error("USER_ACTIONS: Error in getOrCreateUser, error:", err);
     return {
       success: false,
       error:
