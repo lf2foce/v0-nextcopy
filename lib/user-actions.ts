@@ -8,10 +8,14 @@ import { credit_logs } from "@/lib/schema"
 
 // Server action to get or create a user from Clerk
 export async function getOrCreateUser() {
+  console.log('USER_ACTIONS: getOrCreateUser called');
   try {
+    console.log('USER_ACTIONS: Attempting to get userId from auth');
     const { userId } = await auth();
+    console.log('USER_ACTIONS: userId from auth:', userId);
 
     if (!userId) {
+      console.error('USER_ACTIONS: Unauthorized - userId is missing from auth');
       return {
         success: false,
         error: "Unauthorized: Missing Clerk user ID.",
@@ -19,12 +23,15 @@ export async function getOrCreateUser() {
     }
 
     // Check if the user already exists in the database
+    console.log('USER_ACTIONS: Checking for existing user in DB with userId:', userId);
     const existingUser = await db
       .select()
       .from(users)
       .where(eq(users.id, userId));
+    console.log('USER_ACTIONS: Existing user query result:', existingUser);
 
     if (existingUser.length > 0) {
+      console.log('USER_ACTIONS: Existing user found:', existingUser[0]);
       return {
         success: true,
         data: existingUser[0],
@@ -32,9 +39,12 @@ export async function getOrCreateUser() {
     }
 
     // Fetch user details from Clerk
+    console.log('USER_ACTIONS: No existing user found. Fetching user details from Clerk for userId:', userId);
     const clerkUser = await currentUser();
+    console.log('USER_ACTIONS: Clerk user details:', clerkUser);
 
     if (!clerkUser) {
+      console.error('USER_ACTIONS: Clerk user not found for userId:', userId);
       return {
         success: false,
         error: "Clerk user not found.",
@@ -50,6 +60,7 @@ export async function getOrCreateUser() {
       primaryEmail?.verification?.status === "verified";
 
     // Insert the new user into the database
+    console.log('USER_ACTIONS: Creating new user in DB with userId:', userId, 'and Clerk user details:', clerkUser);
     const newUser = await db
       .insert(users)
       .values({
@@ -66,12 +77,13 @@ export async function getOrCreateUser() {
       })
       .returning();
 
+    console.log('USER_ACTIONS: New user created successfully:', newUser[0]);
     return {
       success: true,
       data: newUser[0],
     };
   } catch (err) {
-    console.error("getOrCreateUser error:", err);
+    console.error("USER_ACTIONS: Error in getOrCreateUser for userId: " + (auth().userId || 'unknown') + ", error:", err);
     return {
       success: false,
       error:
